@@ -1,0 +1,75 @@
+import { describe, expect, test } from "bun:test";
+import { parseCliArgs, runCli } from "../src/cli.ts";
+import { createBufferedIO } from "./helpers.ts";
+
+describe("parseCliArgs", () => {
+	test("bare gwt aliases to add", () => {
+		expect(parseCliArgs([])).toEqual({ type: "run-add" });
+	});
+
+	test("gwt add branch keeps the branch argument", () => {
+		expect(parseCliArgs(["add", "feature/topic"])).toEqual({
+			type: "run-add",
+			branchArg: "feature/topic",
+		});
+	});
+
+	test("gwt add --help resolves to add help", () => {
+		expect(parseCliArgs(["add", "--help"])).toEqual({ type: "add-help" });
+	});
+});
+
+describe("runCli", () => {
+	test("dispatches bare gwt to add", async () => {
+		const io = createBufferedIO();
+		const calls: Array<string | undefined> = [];
+
+		const exitCode = await runCli([], {
+			io,
+			runAdd: async ({ branchArg }) => {
+				calls.push(branchArg);
+				return 0;
+			},
+		});
+
+		expect(exitCode).toBe(0);
+		expect(calls).toEqual([undefined]);
+	});
+
+	test("prints add help without running the command", async () => {
+		const io = createBufferedIO();
+		let called = false;
+
+		const exitCode = await runCli(["add", "--help"], {
+			io,
+			runAdd: async () => {
+				called = true;
+				return 0;
+			},
+		});
+
+		expect(exitCode).toBe(0);
+		expect(called).toBe(false);
+		expect(io.readStdout()).toContain("gwt add <branch>");
+	});
+
+	test("fails on unknown subcommands", async () => {
+		const io = createBufferedIO();
+
+		const exitCode = await runCli(["wat"], { io });
+
+		expect(exitCode).toBe(1);
+		expect(io.readStderr()).toContain("Unknown subcommand: wat");
+		expect(io.readStderr()).toContain("Usage:");
+	});
+
+	test("fails when add receives extra arguments", async () => {
+		const io = createBufferedIO();
+
+		const exitCode = await runCli(["add", "topic", "extra"], { io });
+
+		expect(exitCode).toBe(1);
+		expect(io.readStderr()).toContain("Too many arguments for gwt add");
+		expect(io.readStderr()).toContain("gwt add <branch>");
+	});
+});
