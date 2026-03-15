@@ -66,10 +66,13 @@ async function main() {
 		console.error(
 			`Creating local branch ${selected.localName} tracking ${selected.fullName}...`,
 		);
-		await $`git worktree add ${targetPath} --track -b ${selected.localName} ${selected.fullName}`;
+		const result =
+			await $`git worktree add ${targetPath} --track -b ${selected.localName} ${selected.fullName}`.quiet();
+		writeCapturedOutputToStderr(result);
 	} else {
 		console.error(`Creating worktree for ${selected.localName}...`);
-		await $`git worktree add ${targetPath} ${selected.localName}`;
+		const result = await $`git worktree add ${targetPath} ${selected.localName}`.quiet();
+		writeCapturedOutputToStderr(result);
 	}
 
 	console.log(targetPath);
@@ -92,15 +95,20 @@ Usage:
 }
 
 async function assertGitRepo() {
-	const ok = await quietOk($`git rev-parse --is-inside-work-tree`);
-	if (!ok) {
+	try {
+		const output = (await $`git rev-parse --is-inside-work-tree`.text()).trim();
+		if (output !== "true") {
+			throw new Error("Unexpected git rev-parse output.");
+		}
+	} catch {
 		throw new Error("Current directory is not inside a git repository.");
 	}
 }
 
 async function assertCommand(cmd: string) {
-	const ok = await quietOk($`command -v ${cmd}`);
-	if (!ok) {
+	try {
+		await $`command -v ${cmd}`.text();
+	} catch {
 		throw new Error(`Required command not found: ${cmd}`);
 	}
 }
@@ -266,6 +274,18 @@ function buildVscodeLikeWorktreePath(
 
 async function ensureParentDir(targetPath: string) {
 	await $`mkdir -p ${dirname(targetPath)}`;
+}
+
+function writeCapturedOutputToStderr(result: {
+	stdout: Uint8Array;
+	stderr: Uint8Array;
+}) {
+	if (result.stdout.byteLength > 0) {
+		process.stderr.write(result.stdout);
+	}
+	if (result.stderr.byteLength > 0) {
+		process.stderr.write(result.stderr);
+	}
 }
 
 main().catch((err) => {
