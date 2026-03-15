@@ -17,6 +17,16 @@ describe("parseCliArgs", () => {
 	test("gwt add --help resolves to add help", () => {
 		expect(parseCliArgs(["add", "--help"])).toEqual({ type: "add-help" });
 	});
+
+	test("gwt remove resolves to the remove command", () => {
+		expect(parseCliArgs(["remove"])).toEqual({ type: "run-remove" });
+	});
+
+	test("gwt remove --help resolves to remove help", () => {
+		expect(parseCliArgs(["remove", "--help"])).toEqual({
+			type: "remove-help",
+		});
+	});
 });
 
 describe("runCli", () => {
@@ -53,6 +63,22 @@ describe("runCli", () => {
 		expect(io.readStdout()).toContain("gwt add <branch>");
 	});
 
+	test("dispatches gwt remove to the remove command", async () => {
+		const io = createBufferedIO();
+		let called = false;
+
+		const exitCode = await runCli(["remove"], {
+			io,
+			runRemove: async () => {
+				called = true;
+				return 0;
+			},
+		});
+
+		expect(exitCode).toBe(0);
+		expect(called).toBe(true);
+	});
+
 	test("fails on unknown subcommands", async () => {
 		const io = createBufferedIO();
 
@@ -71,5 +97,15 @@ describe("runCli", () => {
 		expect(exitCode).toBe(1);
 		expect(io.readStderr()).toContain("Too many arguments for gwt add");
 		expect(io.readStderr()).toContain("gwt add <branch>");
+	});
+
+	test("fails when remove receives extra arguments", async () => {
+		const io = createBufferedIO();
+
+		const exitCode = await runCli(["remove", "topic"], { io });
+
+		expect(exitCode).toBe(1);
+		expect(io.readStderr()).toContain("Too many arguments for gwt remove");
+		expect(io.readStderr()).toContain("gwt remove");
 	});
 });

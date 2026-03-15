@@ -1,12 +1,19 @@
 import { printAddHelp, runAddCommand, type RunAddCommandOptions } from "./add.ts";
+import {
+	printRemoveHelp,
+	runRemoveCommand,
+	type RunRemoveCommandOptions,
+} from "./remove.ts";
 import { defaultIO, writeLine, type CliIO, type CliWriter } from "./io.ts";
 
 type ParsedCliAction =
 	| { type: "main-help" }
 	| { type: "add-help" }
-	| { type: "run-add"; branchArg?: string };
+	| { type: "remove-help" }
+	| { type: "run-add"; branchArg?: string }
+	| { type: "run-remove" };
 
-type HelpTarget = "main" | "add";
+type HelpTarget = "main" | "add" | "remove";
 
 class UsageError extends Error {
 	constructor(
@@ -21,11 +28,16 @@ class UsageError extends Error {
 export type RunCliOptions = {
 	io?: CliIO;
 	runAdd?: (options: RunAddCommandOptions) => Promise<number>;
+	runRemove?: (options: RunRemoveCommandOptions) => Promise<number>;
 };
 
 export async function runCli(
 	argv: string[],
-	{ io = defaultIO, runAdd = runAddCommand }: RunCliOptions = {},
+	{
+		io = defaultIO,
+		runAdd = runAddCommand,
+		runRemove = runRemoveCommand,
+	}: RunCliOptions = {},
 ): Promise<number> {
 	try {
 		const action = parseCliArgs(argv);
@@ -37,8 +49,13 @@ export async function runCli(
 			case "add-help":
 				printAddHelp(io.stdout);
 				return 0;
+			case "remove-help":
+				printRemoveHelp(io.stdout);
+				return 0;
 			case "run-add":
 				return await runAdd({ branchArg: action.branchArg, io });
+			case "run-remove":
+				return await runRemove({ io });
 		}
 	} catch (error) {
 		if (error instanceof UsageError) {
@@ -71,7 +88,7 @@ export function parseCliArgs(argv: string[]): ParsedCliAction {
 		case "add":
 			return parseAddArgs(rest);
 		case "remove":
-			throw new UsageError("Unknown subcommand: remove", "main");
+			return parseRemoveArgs(rest);
 		default:
 			if (first.startsWith("-")) {
 				throw new UsageError(`Unknown option: ${first}`, "main");
@@ -106,6 +123,27 @@ function parseAddArgs(args: string[]): ParsedCliAction {
 	return { type: "run-add", branchArg };
 }
 
+function parseRemoveArgs(args: string[]): ParsedCliAction {
+	if (args.length === 0) {
+		return { type: "run-remove" };
+	}
+
+	const onlyArg = args[0];
+	if (args.length === 1 && onlyArg && isHelpFlag(onlyArg)) {
+		return { type: "remove-help" };
+	}
+
+	if (!onlyArg) {
+		return { type: "run-remove" };
+	}
+
+	if (onlyArg.startsWith("-")) {
+		throw new UsageError(`Unknown option: ${onlyArg}`, "remove");
+	}
+
+	throw new UsageError(`Too many arguments for gwt remove: ${onlyArg}`, "remove");
+}
+
 function isHelpFlag(value: string) {
 	return value === "-h" || value === "--help";
 }
@@ -113,6 +151,10 @@ function isHelpFlag(value: string) {
 function printHelpForTarget(target: HelpTarget, writer: CliWriter) {
 	if (target === "add") {
 		printAddHelp(writer);
+		return;
+	}
+	if (target === "remove") {
+		printRemoveHelp(writer);
 		return;
 	}
 	printMainHelp(writer);
@@ -126,17 +168,19 @@ export function printMainHelp(writer: CliWriter) {
 	writeLine(writer, "Usage:");
 	writeLine(writer, "  gwt");
 	writeLine(writer, "  gwt add [branch]");
+	writeLine(writer, "  gwt remove");
 	writeLine(writer, "  gwt --help");
 	writeLine(writer);
 	writeLine(writer, "Commands:");
 	writeLine(writer, "  add     Create or reuse a worktree for a branch.");
+	writeLine(writer, "  remove  Remove a linked worktree and delete its branch.");
 	writeLine(writer);
 	writeLine(writer, "Notes:");
 	writeLine(writer, "  Running bare `gwt` is equivalent to `gwt add`.");
 	writeLine(writer);
 	writeLine(writer, "Requirements:");
 	writeLine(writer, "  - git");
-	writeLine(writer, "  - fzf (interactive add only)");
+	writeLine(writer, "  - fzf (interactive add/remove)");
 	writeLine(writer, "  - bun");
 }
 

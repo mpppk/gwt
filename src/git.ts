@@ -22,6 +22,12 @@ export type WorktreeInfo = {
 	detached?: boolean;
 };
 
+export type GitCommandResult = {
+	exitCode: number;
+	stdout: Uint8Array;
+	stderr: Uint8Array;
+};
+
 const WINDOWS_RESERVED_BASENAME_RE = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i;
 const INVALID_PATH_CHARS = new Set([
 	"<",
@@ -83,6 +89,10 @@ export async function getMainWorktreeRoot(): Promise<string> {
 	}
 
 	throw new Error("Failed to resolve main worktree root from git metadata.");
+}
+
+export async function getCurrentWorktreeRoot(): Promise<string> {
+	return (await $`git rev-parse --show-toplevel`.text()).trim();
 }
 
 export async function listBranches(): Promise<BranchItem[]> {
@@ -173,6 +183,10 @@ export function formatDisplay(
 	].join("  ");
 }
 
+export function formatWorktreeDisplay(branchName: string, path: string) {
+	return [branchName.padEnd(40), path].join("  ");
+}
+
 export async function localBranchExists(name: string): Promise<boolean> {
 	return quietOk($`git show-ref --verify --quiet ${`refs/heads/${name}`}`);
 }
@@ -211,6 +225,14 @@ export function findWorktreeByBranch(
 	return worktrees.find((w) => w.branch === `refs/heads/${localBranchName}`);
 }
 
+export function getLocalBranchName(branchRef?: string): string | null {
+	if (!branchRef?.startsWith("refs/heads/")) {
+		return null;
+	}
+
+	return branchRef.slice("refs/heads/".length);
+}
+
 export function buildWorktreePath(repoRoot: string, branchName: string): string {
 	const repoName = basename(repoRoot);
 	const parent = dirname(repoRoot);
@@ -243,6 +265,49 @@ export function sanitizeWorktreeDirName(branchName: string): string {
 
 export async function ensureParentDir(targetPath: string) {
 	await $`mkdir -p ${dirname(targetPath)}`;
+}
+
+export async function isWorktreeDirty(path: string): Promise<boolean> {
+	const status = (
+		await $`git -C ${path} status --porcelain --untracked-files=all`.text()
+	).trim();
+	return status.length > 0;
+}
+
+export async function getAheadCount(path: string): Promise<number> {
+	const upstreamResult = await $`git -C ${path} rev-parse --abbrev-ref --symbolic-full-name ${"@{upstream}"}`.quiet().nothrow();
+	if (upstreamResult.exitCode !== 0) {
+		return 0;
+	}
+
+	const upstream = new TextDecoder().decode(upstreamResult.stdout).trim();
+	if (!upstream) {
+		return 0;
+	}
+
+	const count = (
+		await $`git -C ${path} rev-list --count ${`${upstream}..HEAD`}`.text()
+	).trim();
+	const parsed = Number.parseInt(count, 10);
+
+	return Number.isNaN(parsed) ? 0 : parsed;
+}
+
+export async function removeWorktree(
+	path: string,
+	force = false,
+): Promise<GitCommandResult> {
+	if (force) {
+		return await $`git worktree remove --force ${path}`.quiet().nothrow();
+	}
+
+	return await $`git worktree remove ${path}`.quiet().nothrow();
+}
+
+export async function deleteLocalBranch(
+	branchName: string,
+): Promise<GitCommandResult> {
+	return await $`git branch -d ${branchName}`.quiet().nothrow();
 }
 
 export function writeCapturedOutputTo(
