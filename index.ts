@@ -269,7 +269,35 @@ function buildVscodeLikeWorktreePath(
 ): string {
 	const repoName = basename(repoRoot);
 	const parent = dirname(repoRoot);
-	return resolve(parent, `${repoName}.worktrees`, ...branchName.split("/"));
+	const dirName = sanitizeWorktreeDirName(branchName);
+	return resolve(parent, `${repoName}.worktrees`, dirName);
+}
+
+const WINDOWS_RESERVED_BASENAME_RE =
+	/^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i;
+const INVALID_PATH_CHARS = new Set(["<", ">", ":", '"', "/", "\\", "|", "?", "*"]);
+
+function sanitizeWorktreeDirName(branchName: string): string {
+	let sanitized = "";
+	for (const ch of branchName) {
+		const code = ch.charCodeAt(0);
+		sanitized += code <= 0x1f || INVALID_PATH_CHARS.has(ch) ? "-" : ch;
+	}
+
+	let name = sanitized
+		.replace(/-+/g, "-")
+		.replace(/[. ]+$/g, "")
+		.replace(/^-+|-+$/g, "");
+
+	if (!name) {
+		name = "_";
+	}
+
+	if (WINDOWS_RESERVED_BASENAME_RE.test(name)) {
+		name = `_${name}`;
+	}
+
+	return name;
 }
 
 async function ensureParentDir(targetPath: string) {
