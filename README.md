@@ -1,6 +1,6 @@
 # gwt
 
-`gwt` fetches branches from the current Git repository and creates a matching
+`gwt` resolves branches from the current Git repository and creates a matching
 worktree under a sibling `.worktrees` directory.
 
 ## Requirements
@@ -19,7 +19,7 @@ gwt --help
 ```
 
 - `gwt` is an alias for `gwt add`
-- `gwt add` fetches remotes, opens `fzf`, and creates or reuses a worktree
+- `gwt add` opens `fzf` and creates or reuses a worktree
 - `gwt add <branch>` resolves the branch without opening `fzf`
 
 Branch resolution order for `gwt add <branch>`:

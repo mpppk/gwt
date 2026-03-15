@@ -61,6 +61,46 @@ describe("gwt add integration", () => {
 		expect(second.exitCode).toBe(0);
 		expect(second.stdout.trim()).toBe(expectedPath);
 	});
+
+	test("creates a worktree for a local branch without contacting remotes", () => {
+		const sandbox = makeTempDir("gwt-add-local-integration-");
+		tempDirs.push(sandbox);
+
+		const workspace = join(sandbox, "workspace");
+		run(["git", "init", workspace]);
+		run(["git", "-C", workspace, "config", "user.name", "Test User"]);
+		run(["git", "-C", workspace, "config", "user.email", "test@example.com"]);
+		writeFileSync(join(workspace, "README.md"), "workspace\n");
+		run(["git", "-C", workspace, "add", "README.md"]);
+		run(["git", "-C", workspace, "commit", "-m", "initial commit"]);
+		run(["git", "-C", workspace, "branch", "-M", "main"]);
+		run(["git", "-C", workspace, "branch", "feature/local-only"]);
+		run([
+			"git",
+			"-C",
+			workspace,
+			"remote",
+			"add",
+			"origin",
+			"https://example.invalid/repo.git",
+		]);
+
+		const script = resolve(import.meta.dir, "..", "index.ts");
+		const expectedPath = buildWorktreePath(
+			realpathSync(workspace),
+			"feature/local-only",
+		);
+
+		const result = run(
+			[process.execPath, "run", script, "add", "feature/local-only"],
+			workspace,
+		);
+		expect(result.exitCode).toBe(0);
+		expect(result.stdout.trim()).toBe(expectedPath);
+		expect(run(["git", "-C", expectedPath, "rev-parse", "--abbrev-ref", "HEAD"]).stdout.trim()).toBe(
+			"feature/local-only",
+		);
+	});
 });
 
 function run(cmd: string[], cwd?: string) {

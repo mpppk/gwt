@@ -38,9 +38,6 @@ export async function runAddCommand({
 
 	const mainWorktreeRoot = await getMainWorktreeRoot();
 
-	writeLine(io.stderr, "Fetching remote branches...");
-	await $`git fetch --all --prune --quiet`;
-
 	const branches = await listBranches();
 	if (branches.length === 0) {
 		throw new Error("No branches found.");
