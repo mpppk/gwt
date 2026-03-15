@@ -71,7 +71,8 @@ async function main() {
 		writeCapturedOutputToStderr(result);
 	} else {
 		console.error(`Creating worktree for ${selected.localName}...`);
-		const result = await $`git worktree add ${targetPath} ${selected.localName}`.quiet();
+		const result =
+			await $`git worktree add ${targetPath} ${selected.localName}`.quiet();
 		writeCapturedOutputToStderr(result);
 	}
 
@@ -80,7 +81,7 @@ async function main() {
 
 function printHelp() {
 	console.log(`
-git-worktree-pick
+gwt
 
 Fetch remote branches, fuzzy-select a branch, and create a matching worktree.
 
@@ -90,7 +91,7 @@ Requirements:
   - bun
 
 Usage:
-  git-worktree-pick
+  gwt
 `);
 }
 
@@ -273,9 +274,18 @@ function buildVscodeLikeWorktreePath(
 	return resolve(parent, `${repoName}.worktrees`, dirName);
 }
 
-const WINDOWS_RESERVED_BASENAME_RE =
-	/^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i;
-const INVALID_PATH_CHARS = new Set(["<", ">", ":", '"', "/", "\\", "|", "?", "*"]);
+const WINDOWS_RESERVED_BASENAME_RE = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i;
+const INVALID_PATH_CHARS = new Set([
+	"<",
+	">",
+	":",
+	'"',
+	"/",
+	"\\",
+	"|",
+	"?",
+	"*",
+]);
 
 function sanitizeWorktreeDirName(branchName: string): string {
 	let sanitized = "";
