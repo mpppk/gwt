@@ -1,5 +1,9 @@
 {
 	"name": "gwt",
+	"version": "0.1.0",
+	"bin": {
+		"gwt": "index.ts"
+	},
 	"module": "index.ts",
 	"scripts": {
 		"lint:type": "bunx tsc --noEmit"
