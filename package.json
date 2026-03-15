@@ -1,0 +1,12 @@
+{
+	"name": "gwt",
+	"module": "index.ts",
+	"scripts": {
+		"lint:type": "bunx tsc --noEmit"
+	},
+	"devDependencies": {
+		"@types/bun": "latest"
+	},
+	"private": true,
+	"type": "module"
+}
