@@ -18,6 +18,13 @@ describe("parseCliArgs", () => {
 		expect(parseCliArgs(["add", "--help"])).toEqual({ type: "add-help" });
 	});
 
+	test("gwt add --pr resolves to PR mode", () => {
+		expect(parseCliArgs(["add", "--pr"])).toEqual({
+			type: "run-add",
+			usePullRequests: true,
+		});
+	});
+
 	test("gwt remove resolves to the remove command", () => {
 		expect(parseCliArgs(["remove"])).toEqual({ type: "run-remove" });
 	});
@@ -61,6 +68,23 @@ describe("runCli", () => {
 		expect(exitCode).toBe(0);
 		expect(called).toBe(false);
 		expect(io.readStdout()).toContain("gwt add <branch>");
+		expect(io.readStdout()).toContain("gwt add --pr");
+	});
+
+	test("dispatches gwt add --pr to PR mode", async () => {
+		const io = createBufferedIO();
+		const calls: Array<boolean | undefined> = [];
+
+		const exitCode = await runCli(["add", "--pr"], {
+			io,
+			runAdd: async ({ usePullRequests }) => {
+				calls.push(usePullRequests);
+				return 0;
+			},
+		});
+
+		expect(exitCode).toBe(0);
+		expect(calls).toEqual([true]);
 	});
 
 	test("dispatches gwt remove to the remove command", async () => {
@@ -97,6 +121,16 @@ describe("runCli", () => {
 		expect(exitCode).toBe(1);
 		expect(io.readStderr()).toContain("Too many arguments for gwt add");
 		expect(io.readStderr()).toContain("gwt add <branch>");
+	});
+
+	test("fails when add receives --pr and a branch argument", async () => {
+		const io = createBufferedIO();
+
+		const exitCode = await runCli(["add", "--pr", "topic"], { io });
+
+		expect(exitCode).toBe(1);
+		expect(io.readStderr()).toContain("Too many arguments for gwt add");
+		expect(io.readStderr()).toContain("gwt add --pr");
 	});
 
 	test("fails when remove receives extra arguments", async () => {

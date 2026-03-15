@@ -267,6 +267,29 @@ export async function ensureParentDir(targetPath: string) {
 	await $`mkdir -p ${dirname(targetPath)}`;
 }
 
+export async function addWorktree(
+	targetPath: string,
+	branchName: string,
+): Promise<GitCommandResult> {
+	return await $`git worktree add ${targetPath} ${branchName}`.quiet().nothrow();
+}
+
+export async function addTrackedWorktree(
+	targetPath: string,
+	localBranchName: string,
+	remoteBranchName: string,
+): Promise<GitCommandResult> {
+	return await $`git worktree add ${targetPath} --track -b ${localBranchName} ${remoteBranchName}`.quiet().nothrow();
+}
+
+export async function fetchRemoteBranch(
+	remoteName: string,
+	branchName: string,
+): Promise<GitCommandResult> {
+	const refspec = `${branchName}:refs/remotes/${remoteName}/${branchName}`;
+	return await $`git fetch ${remoteName} ${refspec}`.quiet().nothrow();
+}
+
 export async function isWorktreeDirty(path: string): Promise<boolean> {
 	const status = (
 		await $`git -C ${path} status --porcelain --untracked-files=all`.text()

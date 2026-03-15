@@ -10,7 +10,7 @@ type ParsedCliAction =
 	| { type: "main-help" }
 	| { type: "add-help" }
 	| { type: "remove-help" }
-	| { type: "run-add"; branchArg?: string }
+	| { type: "run-add"; branchArg?: string; usePullRequests?: boolean }
 	| { type: "run-remove" };
 
 type HelpTarget = "main" | "add" | "remove";
@@ -53,7 +53,11 @@ export async function runCli(
 				printRemoveHelp(io.stdout);
 				return 0;
 			case "run-add":
-				return await runAdd({ branchArg: action.branchArg, io });
+				return await runAdd({
+					branchArg: action.branchArg,
+					io,
+					usePullRequests: action.usePullRequests,
+				});
 			case "run-remove":
 				return await runRemove({ io });
 		}
@@ -102,9 +106,24 @@ function parseAddArgs(args: string[]): ParsedCliAction {
 		return { type: "run-add" };
 	}
 
+	if (args.length === 1 && args[0] === "--pr") {
+		return { type: "run-add", usePullRequests: true };
+	}
+
 	const onlyArg = args[0];
 	if (args.length === 1 && onlyArg && isHelpFlag(onlyArg)) {
 		return { type: "add-help" };
+	}
+
+	if (args.includes("--pr")) {
+		const extraArg = args.find((arg) => arg !== "--pr");
+		if (extraArg) {
+			if (extraArg.startsWith("-")) {
+				throw new UsageError(`Unknown option: ${extraArg}`, "add");
+			}
+			throw new UsageError(`Too many arguments for gwt add: ${extraArg}`, "add");
+		}
+		throw new UsageError("Unknown option: --pr", "add");
 	}
 
 	const [branchArg, extraArg] = args;
@@ -168,6 +187,7 @@ export function printMainHelp(writer: CliWriter) {
 	writeLine(writer, "Usage:");
 	writeLine(writer, "  gwt");
 	writeLine(writer, "  gwt add [branch]");
+	writeLine(writer, "  gwt add --pr");
 	writeLine(writer, "  gwt remove");
 	writeLine(writer, "  gwt --help");
 	writeLine(writer);
@@ -181,6 +201,7 @@ export function printMainHelp(writer: CliWriter) {
 	writeLine(writer, "Requirements:");
 	writeLine(writer, "  - git");
 	writeLine(writer, "  - fzf (interactive add/remove)");
+	writeLine(writer, "  - gh (PR mode only)");
 	writeLine(writer, "  - bun");
 }
 

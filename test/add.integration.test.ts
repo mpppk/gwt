@@ -1,10 +1,17 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { realpathSync, writeFileSync } from "node:fs";
+import {
+	chmodSync,
+	mkdirSync,
+	realpathSync,
+	readFileSync,
+	writeFileSync,
+} from "node:fs";
 import { join, resolve } from "node:path";
 import { buildWorktreePath } from "../src/git.ts";
-import { makeTempDir, removeTempDir } from "./helpers.ts";
+import { makeTempDir, removeTempDir, runCommand } from "./helpers.ts";
 
 const tempDirs: string[] = [];
+const script = resolve(import.meta.dir, "..", "index.ts");
 
 afterEach(() => {
 	for (const dir of tempDirs.splice(0)) {
@@ -21,42 +28,48 @@ describe("gwt add integration", () => {
 		const seed = join(sandbox, "seed");
 		const workspace = join(sandbox, "workspace");
 
-		run(["git", "init", "--bare", remote]);
-		run(["git", "clone", remote, seed]);
-		run(["git", "-C", seed, "config", "user.name", "Test User"]);
-		run(["git", "-C", seed, "config", "user.email", "test@example.com"]);
-		run(["git", "-C", seed, "switch", "-c", "main"]);
+		runCommand(["git", "init", "--bare", remote]);
+		runCommand(["git", "clone", remote, seed]);
+		runCommand(["git", "-C", seed, "config", "user.name", "Test User"]);
+		runCommand(["git", "-C", seed, "config", "user.email", "test@example.com"]);
+		runCommand(["git", "-C", seed, "switch", "-c", "main"]);
 		writeFileSync(join(seed, "README.md"), "seed\n");
-		run(["git", "-C", seed, "add", "README.md"]);
-		run(["git", "-C", seed, "commit", "-m", "initial commit"]);
-		run(["git", "-C", seed, "push", "-u", "origin", "main"]);
-		run(["git", "-C", seed, "switch", "-c", "feature/remote-only"]);
+		runCommand(["git", "-C", seed, "add", "README.md"]);
+		runCommand(["git", "-C", seed, "commit", "-m", "initial commit"]);
+		runCommand(["git", "-C", seed, "push", "-u", "origin", "main"]);
+		runCommand(["git", "-C", seed, "switch", "-c", "feature/remote-only"]);
 		writeFileSync(join(seed, "feature.txt"), "remote branch\n");
-		run(["git", "-C", seed, "add", "feature.txt"]);
-		run(["git", "-C", seed, "commit", "-m", "add remote-only branch"]);
-		run(["git", "-C", seed, "push", "-u", "origin", "feature/remote-only"]);
+		runCommand(["git", "-C", seed, "add", "feature.txt"]);
+		runCommand(["git", "-C", seed, "commit", "-m", "add remote-only branch"]);
+		runCommand(["git", "-C", seed, "push", "-u", "origin", "feature/remote-only"]);
 
-		run(["git", "clone", "-b", "main", remote, workspace]);
+		runCommand(["git", "clone", "-b", "main", remote, workspace]);
 
-		const script = resolve(import.meta.dir, "..", "index.ts");
 		const expectedPath = buildWorktreePath(
 			realpathSync(workspace),
 			"feature/remote-only",
 		);
 
-		const first = run(
+		const first = runCommand(
 			[process.execPath, "run", script, "add", "feature/remote-only"],
-			workspace,
+			{ cwd: workspace },
 		);
 		expect(first.exitCode).toBe(0);
 		expect(first.stdout.trim()).toBe(expectedPath);
-		expect(run(["git", "-C", expectedPath, "rev-parse", "--abbrev-ref", "HEAD"]).stdout.trim()).toBe(
-			"feature/remote-only",
-		);
+		expect(
+			runCommand([
+				"git",
+				"-C",
+				expectedPath,
+				"rev-parse",
+				"--abbrev-ref",
+				"HEAD",
+			]).stdout.trim(),
+		).toBe("feature/remote-only");
 
-		const second = run(
+		const second = runCommand(
 			[process.execPath, "run", script, "add", "feature/remote-only"],
-			workspace,
+			{ cwd: workspace },
 		);
 		expect(second.exitCode).toBe(0);
 		expect(second.stdout.trim()).toBe(expectedPath);
@@ -67,15 +80,15 @@ describe("gwt add integration", () => {
 		tempDirs.push(sandbox);
 
 		const workspace = join(sandbox, "workspace");
-		run(["git", "init", workspace]);
-		run(["git", "-C", workspace, "config", "user.name", "Test User"]);
-		run(["git", "-C", workspace, "config", "user.email", "test@example.com"]);
+		runCommand(["git", "init", workspace]);
+		runCommand(["git", "-C", workspace, "config", "user.name", "Test User"]);
+		runCommand(["git", "-C", workspace, "config", "user.email", "test@example.com"]);
 		writeFileSync(join(workspace, "README.md"), "workspace\n");
-		run(["git", "-C", workspace, "add", "README.md"]);
-		run(["git", "-C", workspace, "commit", "-m", "initial commit"]);
-		run(["git", "-C", workspace, "branch", "-M", "main"]);
-		run(["git", "-C", workspace, "branch", "feature/local-only"]);
-		run([
+		runCommand(["git", "-C", workspace, "add", "README.md"]);
+		runCommand(["git", "-C", workspace, "commit", "-m", "initial commit"]);
+		runCommand(["git", "-C", workspace, "branch", "-M", "main"]);
+		runCommand(["git", "-C", workspace, "branch", "feature/local-only"]);
+		runCommand([
 			"git",
 			"-C",
 			workspace,
@@ -85,43 +98,213 @@ describe("gwt add integration", () => {
 			"https://example.invalid/repo.git",
 		]);
 
-		const script = resolve(import.meta.dir, "..", "index.ts");
 		const expectedPath = buildWorktreePath(
 			realpathSync(workspace),
 			"feature/local-only",
 		);
 
-		const result = run(
+		const result = runCommand(
 			[process.execPath, "run", script, "add", "feature/local-only"],
-			workspace,
+			{ cwd: workspace },
 		);
 		expect(result.exitCode).toBe(0);
 		expect(result.stdout.trim()).toBe(expectedPath);
-		expect(run(["git", "-C", expectedPath, "rev-parse", "--abbrev-ref", "HEAD"]).stdout.trim()).toBe(
-			"feature/local-only",
+		expect(
+			runCommand([
+				"git",
+				"-C",
+				expectedPath,
+				"rev-parse",
+				"--abbrev-ref",
+				"HEAD",
+			]).stdout.trim(),
+		).toBe("feature/local-only");
+	});
+
+	test("creates a worktree from a same-repo PR and filters out cross-repo PRs", () => {
+		const sandbox = makeTempDir("gwt-add-pr-integration-");
+		tempDirs.push(sandbox);
+
+		const remote = join(sandbox, "remote.git");
+		const seed = join(sandbox, "seed");
+		const workspace = join(sandbox, "workspace");
+		const capturePath = join(sandbox, "fzf-input.txt");
+
+		runCommand(["git", "init", "--bare", remote]);
+		runCommand(["git", "clone", remote, seed]);
+		runCommand(["git", "-C", seed, "config", "user.name", "Test User"]);
+		runCommand(["git", "-C", seed, "config", "user.email", "test@example.com"]);
+		runCommand(["git", "-C", seed, "switch", "-c", "main"]);
+		writeFileSync(join(seed, "README.md"), "seed\n");
+		runCommand(["git", "-C", seed, "add", "README.md"]);
+		runCommand(["git", "-C", seed, "commit", "-m", "initial commit"]);
+		runCommand(["git", "-C", seed, "push", "-u", "origin", "main"]);
+		runCommand(["git", "clone", "-b", "main", remote, workspace]);
+		runCommand(["git", "-C", workspace, "config", "user.name", "Test User"]);
+		runCommand(["git", "-C", workspace, "config", "user.email", "test@example.com"]);
+
+		runCommand(["git", "-C", seed, "switch", "-c", "feature/pr-remote"]);
+		writeFileSync(join(seed, "pr.txt"), "pr branch\n");
+		runCommand(["git", "-C", seed, "add", "pr.txt"]);
+		runCommand(["git", "-C", seed, "commit", "-m", "add PR branch"]);
+		runCommand(["git", "-C", seed, "push", "-u", "origin", "feature/pr-remote"]);
+
+		writePullRequestJson(join(sandbox, "prs.json"), [
+			makePullRequestJson(1, "feature/pr-remote", "Same repo PR", false),
+			makePullRequestJson(2, "feature/fork", "Cross repo PR", true),
+		]);
+
+		const expectedPath = buildWorktreePath(
+			realpathSync(workspace),
+			"feature/pr-remote",
 		);
+		const result = runCommand([process.execPath, "run", script, "add", "--pr"], {
+			check: false,
+			cwd: workspace,
+			env: createPrModeEnv(sandbox, "Same repo PR", capturePath),
+		});
+
+		expect(result.exitCode).toBe(0);
+		expect(result.stdout.trim()).toBe(expectedPath);
+		expect(
+			runCommand([
+				"git",
+				"-C",
+				expectedPath,
+				"rev-parse",
+				"--abbrev-ref",
+				"HEAD",
+			]).stdout.trim(),
+		).toBe("feature/pr-remote");
+
+		const fzfInput = readFileSync(capturePath, "utf8");
+		expect(fzfInput).toContain("Same repo PR");
+		expect(fzfInput).toContain("○  #1");
+		expect(fzfInput).not.toContain("Cross repo PR");
+	});
+
+	test("returns the existing worktree path for a PR branch and shows it in fzf", () => {
+		const sandbox = makeTempDir("gwt-add-pr-existing-");
+		tempDirs.push(sandbox);
+
+		const workspace = join(sandbox, "workspace");
+		const capturePath = join(sandbox, "fzf-input.txt");
+
+		runCommand(["git", "init", workspace]);
+		runCommand(["git", "-C", workspace, "config", "user.name", "Test User"]);
+		runCommand(["git", "-C", workspace, "config", "user.email", "test@example.com"]);
+		writeFileSync(join(workspace, "README.md"), "workspace\n");
+		runCommand(["git", "-C", workspace, "add", "README.md"]);
+		runCommand(["git", "-C", workspace, "commit", "-m", "initial commit"]);
+		runCommand(["git", "-C", workspace, "branch", "-M", "main"]);
+		runCommand(["git", "-C", workspace, "branch", "feature/pr-existing"]);
+
+		const existingPath = join(sandbox, "feature-pr-existing");
+		runCommand([
+			"git",
+			"-C",
+			workspace,
+			"worktree",
+			"add",
+			existingPath,
+			"feature/pr-existing",
+		]);
+
+		writePullRequestJson(join(sandbox, "prs.json"), [
+			makePullRequestJson(10, "feature/pr-existing", "Existing worktree PR", false),
+		]);
+
+		const result = runCommand([process.execPath, "run", script, "add", "--pr"], {
+			check: false,
+			cwd: workspace,
+			env: createPrModeEnv(sandbox, "Existing worktree PR", capturePath),
+		});
+
+		expect(result.exitCode).toBe(0);
+		expect(result.stdout.trim()).toBe(realpathSync(existingPath));
+
+		const fzfInput = readFileSync(capturePath, "utf8");
+		expect(fzfInput).toContain("●  #10");
 	});
 });
 
-function run(cmd: string[], cwd?: string) {
-	const proc = Bun.spawnSync(cmd, {
-		cwd,
-		stdout: "pipe",
-		stderr: "pipe",
-	});
+function createPrModeEnv(
+	sandbox: string,
+	query: string,
+	capturePath: string,
+) {
+	const binDir = join(sandbox, "bin");
+	mkdirSync(binDir, { recursive: true });
 
-	const stdout = new TextDecoder().decode(proc.stdout);
-	const stderr = new TextDecoder().decode(proc.stderr);
+	const fzfPath = join(binDir, "fzf");
+	writeFileSync(
+		fzfPath,
+		[
+			"#!/bin/sh",
+			'capture="${GWT_FZF_CAPTURE:-/dev/null}"',
+			'cat | tee "$capture" | {',
+			'  if [ -n "$GWT_FZF_QUERY" ]; then',
+			'    grep -F "$GWT_FZF_QUERY" | head -n 1',
+			"  else",
+			"    head -n 1",
+			"  fi",
+			"}",
+			"",
+		].join("\n"),
+	);
+	chmodSync(fzfPath, 0o755);
 
-	if (proc.exitCode !== 0) {
-		throw new Error(
-			[`Command failed: ${cmd.join(" ")}`, stdout, stderr].filter(Boolean).join("\n"),
-		);
-	}
+	const ghPath = join(binDir, "gh");
+	writeFileSync(
+		ghPath,
+		[
+			"#!/bin/sh",
+			'if [ "$1" = "pr" ] && [ "$2" = "list" ]; then',
+			'  cat "$GWT_GH_OUTPUT"',
+			"  exit 0",
+			"fi",
+			'echo "unexpected gh args: $@" >&2',
+			"exit 1",
+			"",
+		].join("\n"),
+	);
+	chmodSync(ghPath, 0o755);
 
 	return {
-		exitCode: proc.exitCode,
-		stdout,
-		stderr,
+		...process.env,
+		GWT_FZF_CAPTURE: capturePath,
+		GWT_FZF_QUERY: query,
+		GWT_GH_OUTPUT: join(sandbox, "prs.json"),
+		PATH: `${binDir}:${process.env.PATH ?? ""}`,
+	};
+}
+
+function writePullRequestJson(
+	path: string,
+	pullRequests: Array<{
+		author: { login: string };
+		headRefName: string;
+		isCrossRepository: boolean;
+		number: number;
+		title: string;
+		updatedAt: string;
+	}>,
+) {
+	writeFileSync(path, JSON.stringify(pullRequests));
+}
+
+function makePullRequestJson(
+	number: number,
+	headRefName: string,
+	title: string,
+	isCrossRepository: boolean,
+) {
+	return {
+		author: { login: "octocat" },
+		headRefName,
+		isCrossRepository,
+		number,
+		title,
+		updatedAt: "2026-03-16T00:00:00Z",
 	};
 }
