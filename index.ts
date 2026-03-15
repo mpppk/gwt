@@ -32,7 +32,7 @@ async function main() {
 	await assertCommand("fzf");
 	await assertGitRepo();
 
-	const repoRoot = await getRepoRoot();
+	const mainWorktreeRoot = await getMainWorktreeRoot();
 
 	console.error("Fetching remote branches...");
 	await $`git fetch --all --prune --quiet`;
@@ -55,7 +55,10 @@ async function main() {
 	}
 
 	const hasLocal = await localBranchExists(selected.localName);
-	const targetPath = buildVscodeLikeWorktreePath(repoRoot, selected.localName);
+	const targetPath = buildVscodeLikeWorktreePath(
+		mainWorktreeRoot,
+		selected.localName,
+	);
 
 	await ensureParentDir(targetPath);
 
@@ -123,8 +126,26 @@ async function quietOk(p: Promise<unknown>) {
 	}
 }
 
-async function getRepoRoot(): Promise<string> {
-	return (await $`git rev-parse --show-toplevel`.text()).trim();
+async function getMainWorktreeRoot(): Promise<string> {
+	const worktrees = await listWorktrees();
+	const mainFromList = worktrees[0]?.path;
+	if (mainFromList) {
+		return mainFromList;
+	}
+
+	const commonGitDir = (
+		await $`git rev-parse --path-format=absolute --git-common-dir`.text()
+	).trim();
+
+	if (!commonGitDir) {
+		throw new Error("Failed to resolve git common dir.");
+	}
+
+	if (basename(commonGitDir) === ".git") {
+		return dirname(commonGitDir);
+	}
+
+	throw new Error("Failed to resolve main worktree root from git metadata.");
 }
 
 async function listBranches(): Promise<BranchItem[]> {
