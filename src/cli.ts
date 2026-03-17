@@ -10,7 +10,12 @@ type ParsedCliAction =
 	| { type: "main-help" }
 	| { type: "add-help" }
 	| { type: "remove-help" }
-	| { type: "run-add"; branchArg?: string; usePullRequests?: boolean }
+	| {
+			type: "run-add";
+			branchArg?: string;
+			createNewBranch?: boolean;
+			usePullRequests?: boolean;
+	  }
 	| { type: "run-remove" };
 
 type HelpTarget = "main" | "add" | "remove";
@@ -55,6 +60,7 @@ export async function runCli(
 			case "run-add":
 				return await runAdd({
 					branchArg: action.branchArg,
+					createNewBranch: action.createNewBranch,
 					io,
 					usePullRequests: action.usePullRequests,
 				});
@@ -106,13 +112,41 @@ function parseAddArgs(args: string[]): ParsedCliAction {
 		return { type: "run-add" };
 	}
 
-	if (args.length === 1 && args[0] === "--pr") {
-		return { type: "run-add", usePullRequests: true };
-	}
-
 	const onlyArg = args[0];
 	if (args.length === 1 && onlyArg && isHelpFlag(onlyArg)) {
 		return { type: "add-help" };
+	}
+
+	if (args.includes("--new") && args.includes("--pr")) {
+		throw new UsageError("Cannot combine --new with --pr.", "add");
+	}
+
+	if (args[0] === "--new") {
+		const branchArg = args[1];
+		const extraArg = args[2];
+
+		if (!branchArg) {
+			throw new UsageError("Missing branch name for gwt add --new.", "add");
+		}
+		if (branchArg.startsWith("-")) {
+			throw new UsageError(`Unknown option: ${branchArg}`, "add");
+		}
+		if (extraArg) {
+			if (extraArg.startsWith("-")) {
+				throw new UsageError(`Unknown option: ${extraArg}`, "add");
+			}
+			throw new UsageError(`Too many arguments for gwt add: ${extraArg}`, "add");
+		}
+
+		return { type: "run-add", branchArg, createNewBranch: true };
+	}
+
+	if (args.includes("--new")) {
+		throw new UsageError("Unknown option: --new", "add");
+	}
+
+	if (args.length === 1 && args[0] === "--pr") {
+		return { type: "run-add", usePullRequests: true };
 	}
 
 	if (args.includes("--pr")) {
@@ -187,12 +221,13 @@ export function printMainHelp(writer: CliWriter) {
 	writeLine(writer, "Usage:");
 	writeLine(writer, "  gwt");
 	writeLine(writer, "  gwt add [branch]");
+	writeLine(writer, "  gwt add --new <branch>");
 	writeLine(writer, "  gwt add --pr");
 	writeLine(writer, "  gwt remove");
 	writeLine(writer, "  gwt --help");
 	writeLine(writer);
 	writeLine(writer, "Commands:");
-	writeLine(writer, "  add     Create or reuse a worktree for a branch.");
+	writeLine(writer, "  add     Create, reuse, or start a new branch worktree.");
 	writeLine(writer, "  remove  Remove a linked worktree and delete its branch.");
 	writeLine(writer);
 	writeLine(writer, "Notes:");

@@ -25,6 +25,14 @@ describe("parseCliArgs", () => {
 		});
 	});
 
+	test("gwt add --new branch enables createNewBranch", () => {
+		expect(parseCliArgs(["add", "--new", "feature/topic"])).toEqual({
+			type: "run-add",
+			branchArg: "feature/topic",
+			createNewBranch: true,
+		});
+	});
+
 	test("gwt remove resolves to the remove command", () => {
 		expect(parseCliArgs(["remove"])).toEqual({ type: "run-remove" });
 	});
@@ -68,6 +76,7 @@ describe("runCli", () => {
 		expect(exitCode).toBe(0);
 		expect(called).toBe(false);
 		expect(io.readStdout()).toContain("gwt add <branch>");
+		expect(io.readStdout()).toContain("gwt add --new <branch>");
 		expect(io.readStdout()).toContain("gwt add --pr");
 	});
 
@@ -85,6 +94,27 @@ describe("runCli", () => {
 
 		expect(exitCode).toBe(0);
 		expect(calls).toEqual([true]);
+	});
+
+	test("dispatches gwt add --new with createNewBranch", async () => {
+		const io = createBufferedIO();
+		const calls: Array<{
+			branchArg: string | undefined;
+			createNewBranch: boolean | undefined;
+		}> = [];
+
+		const exitCode = await runCli(["add", "--new", "feature/topic"], {
+			io,
+			runAdd: async ({ branchArg, createNewBranch }) => {
+				calls.push({ branchArg, createNewBranch });
+				return 0;
+			},
+		});
+
+		expect(exitCode).toBe(0);
+		expect(calls).toEqual([
+			{ branchArg: "feature/topic", createNewBranch: true },
+		]);
 	});
 
 	test("dispatches gwt remove to the remove command", async () => {
@@ -131,6 +161,36 @@ describe("runCli", () => {
 		expect(exitCode).toBe(1);
 		expect(io.readStderr()).toContain("Too many arguments for gwt add");
 		expect(io.readStderr()).toContain("gwt add --pr");
+	});
+
+	test("fails when add --new misses the branch name", async () => {
+		const io = createBufferedIO();
+
+		const exitCode = await runCli(["add", "--new"], { io });
+
+		expect(exitCode).toBe(1);
+		expect(io.readStderr()).toContain("Missing branch name for gwt add --new");
+		expect(io.readStderr()).toContain("gwt add --new <branch>");
+	});
+
+	test("fails when add combines --new and --pr", async () => {
+		const io = createBufferedIO();
+
+		const exitCode = await runCli(["add", "--new", "feature/topic", "--pr"], { io });
+
+		expect(exitCode).toBe(1);
+		expect(io.readStderr()).toContain("Cannot combine --new with --pr");
+		expect(io.readStderr()).toContain("gwt add --new <branch>");
+	});
+
+	test("fails when add places --new after a branch argument", async () => {
+		const io = createBufferedIO();
+
+		const exitCode = await runCli(["add", "feature/topic", "--new"], { io });
+
+		expect(exitCode).toBe(1);
+		expect(io.readStderr()).toContain("Unknown option: --new");
+		expect(io.readStderr()).toContain("gwt add --new <branch>");
 	});
 
 	test("fails when remove receives extra arguments", async () => {

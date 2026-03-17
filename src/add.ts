@@ -5,6 +5,7 @@ import {
 	type PullRequestItem,
 } from "./github.ts";
 import {
+	addNewWorktree,
 	addTrackedWorktree,
 	addWorktree,
 	assertCommand,
@@ -37,6 +38,7 @@ export type SelectPullRequest = (
 ) => Promise<PullRequestSelectionItem | null>;
 
 type RunAddCommandDependencies = {
+	addNewWorktree: typeof addNewWorktree;
 	addTrackedWorktree: typeof addTrackedWorktree;
 	addWorktree: typeof addWorktree;
 	assertCommand: typeof assertCommand;
@@ -52,6 +54,7 @@ type RunAddCommandDependencies = {
 
 export type RunAddCommandOptions = {
 	branchArg?: string;
+	createNewBranch?: boolean;
 	deps?: Partial<RunAddCommandDependencies>;
 	io?: CliIO;
 	selectBranch?: SelectBranch;
@@ -60,6 +63,7 @@ export type RunAddCommandOptions = {
 };
 
 const defaultDeps: RunAddCommandDependencies = {
+	addNewWorktree,
 	addTrackedWorktree,
 	addWorktree,
 	assertCommand,
@@ -75,6 +79,7 @@ const defaultDeps: RunAddCommandDependencies = {
 
 export async function runAddCommand({
 	branchArg,
+	createNewBranch = false,
 	deps = {},
 	io = defaultIO,
 	selectBranch = selectBranchInteractive,
@@ -83,6 +88,12 @@ export async function runAddCommand({
 }: RunAddCommandOptions = {}): Promise<number> {
 	if (usePullRequests && branchArg) {
 		throw new Error("`branchArg` cannot be used with `usePullRequests`.");
+	}
+	if (createNewBranch && !branchArg) {
+		throw new Error("`branchArg` is required when `createNewBranch` is true.");
+	}
+	if (createNewBranch && usePullRequests) {
+		throw new Error("`createNewBranch` cannot be used with `usePullRequests`.");
 	}
 
 	const resolvedDeps = { ...defaultDeps, ...deps };
@@ -98,8 +109,13 @@ export async function runAddCommand({
 	const mainWorktreeRoot = await resolvedDeps.getMainWorktreeRoot();
 	const worktrees = await resolvedDeps.listWorktrees();
 
-	const selected = usePullRequests
-		? await selectBranchFromPullRequests({
+	const selected = createNewBranch
+		? await selectBranchForNewMode({
+				branchArg: branchArg ?? "",
+				listBranches: resolvedDeps.listBranches,
+			})
+		: usePullRequests
+			? await selectBranchFromPullRequests({
 				io,
 				listBranches: resolvedDeps.listBranches,
 				listPullRequests: resolvedDeps.listPullRequests,
@@ -107,11 +123,11 @@ export async function runAddCommand({
 				worktrees,
 				fetchRemoteBranch: resolvedDeps.fetchRemoteBranch,
 			})
-		: await selectBranchFromBranches({
-				branchArg,
-				listBranches: resolvedDeps.listBranches,
-				selectBranch,
-			});
+			: await selectBranchFromBranches({
+					branchArg,
+					listBranches: resolvedDeps.listBranches,
+					selectBranch,
+				});
 	if (!selected) {
 		return 130;
 	}
@@ -124,6 +140,8 @@ export async function runAddCommand({
 
 	return await createWorktreeForBranch({
 		io,
+		createNewBranch,
+		addNewWorktree: resolvedDeps.addNewWorktree,
 		localBranchExists: resolvedDeps.localBranchExists,
 		mainWorktreeRoot,
 		addTrackedWorktree: resolvedDeps.addTrackedWorktree,
@@ -138,22 +156,38 @@ export function printAddHelp(writer: CliWriter) {
 	writeLine(writer);
 	writeLine(
 		writer,
-		"Create a worktree for a branch selected interactively or passed as an argument.",
+		"Create, reuse, or create-new a worktree for a selected or specified branch.",
 	);
 	writeLine(writer);
 	writeLine(writer, "Usage:");
 	writeLine(writer, "  gwt add");
 	writeLine(writer, "  gwt add <branch>");
+	writeLine(writer, "  gwt add --new <branch>");
 	writeLine(writer, "  gwt add --pr");
 	writeLine(writer);
 	writeLine(writer, "Options:");
 	writeLine(writer, "  -h, --help  Show help for the add command.");
+	writeLine(
+		writer,
+		"  --new       Create a new branch and worktree for the given branch name.",
+	);
 	writeLine(writer, "  --pr        Select an open same-repo GitHub PR via fzf.");
 	writeLine(writer);
 	writeLine(writer, "Branch resolution order:");
 	writeLine(writer, "  1. exact local branch name");
 	writeLine(writer, "  2. exact remote branch name, e.g. origin/feature/foo");
 	writeLine(writer, "  3. a unique remote branch whose short name matches");
+	writeLine(writer);
+	writeLine(writer, "New mode (`--new <branch>`):");
+	writeLine(writer, "  - Fails if the local branch already exists.");
+	writeLine(
+		writer,
+		"  - Uses explicit remote names (e.g. origin/feature/foo) when provided.",
+	);
+	writeLine(
+		writer,
+		"  - For short names, tracks a unique remote match or creates from HEAD.",
+	);
 	writeLine(writer);
 	writeLine(writer, "PR mode:");
 	writeLine(writer, "  - Lists open same-repo PRs from `gh pr list`.");
@@ -219,6 +253,43 @@ async function selectBranchFromBranches({
 	}
 
 	return await selectBranch(branches);
+}
+
+async function selectBranchForNewMode({
+	branchArg,
+	listBranches,
+}: {
+	branchArg: string;
+	listBranches: () => Promise<BranchItem[]>;
+}): Promise<BranchItem> {
+	const branches = await listBranches();
+	const explicitRemoteName = getExplicitRemoteName(branchArg, branches);
+	if (explicitRemoteName) {
+		const remoteMatch = branches.find(
+			(branch) => branch.kind === "remote" && branch.fullName === branchArg,
+		);
+		if (!remoteMatch) {
+			throw new Error(`Remote branch not found: ${branchArg}`);
+		}
+		if (hasLocalBranch(branches, remoteMatch.localName)) {
+			throw new Error(`Local branch already exists: ${remoteMatch.localName}`);
+		}
+		return remoteMatch;
+	}
+
+	if (hasLocalBranch(branches, branchArg)) {
+		throw new Error(`Local branch already exists: ${branchArg}`);
+	}
+
+	try {
+		return resolveBranchArgument(branchArg, branches);
+	} catch (error) {
+		if (!isBranchNotFoundError(error, branchArg)) {
+			throw error;
+		}
+	}
+
+	return buildNewLocalBranchItem(branchArg);
 }
 
 async function selectBranchFromPullRequests({
@@ -322,15 +393,53 @@ async function resolvePullRequestBranch(
 	}
 }
 
+function hasLocalBranch(branches: BranchItem[], name: string): boolean {
+	return branches.some(
+		(branch) => branch.kind === "local" && branch.localName === name,
+	);
+}
+
+function getExplicitRemoteName(
+	branchArg: string,
+	branches: BranchItem[],
+): string | null {
+	const slashIndex = branchArg.indexOf("/");
+	if (slashIndex <= 0) {
+		return null;
+	}
+
+	const remoteName = branchArg.slice(0, slashIndex);
+	const hasRemote = branches.some(
+		(branch) => branch.kind === "remote" && branch.remoteName === remoteName,
+	);
+	return hasRemote ? remoteName : null;
+}
+
+function buildNewLocalBranchItem(branchName: string): BranchItem {
+	return {
+		display: branchName,
+		fullName: branchName,
+		kind: "local",
+		localName: branchName,
+		shortName: branchName,
+	};
+}
+
 async function createWorktreeForBranch({
+	addNewWorktree,
 	addTrackedWorktree,
 	addWorktree,
+	createNewBranch,
 	ensureParentDir,
 	io,
 	localBranchExists,
 	mainWorktreeRoot,
 	selected,
 }: {
+	addNewWorktree: (
+		targetPath: string,
+		branchName: string,
+	) => Promise<GitCommandResult>;
 	addTrackedWorktree: (
 		targetPath: string,
 		localBranchName: string,
@@ -340,6 +449,7 @@ async function createWorktreeForBranch({
 		targetPath: string,
 		branchName: string,
 	) => Promise<GitCommandResult>;
+	createNewBranch: boolean;
 	ensureParentDir: (targetPath: string) => Promise<void>;
 	io: CliIO;
 	localBranchExists: (name: string) => Promise<boolean>;
@@ -350,6 +460,43 @@ async function createWorktreeForBranch({
 	const targetPath = buildWorktreePath(mainWorktreeRoot, selected.localName);
 
 	await ensureParentDir(targetPath);
+
+	if (createNewBranch) {
+		if (hasLocal) {
+			throw new Error(`Local branch already exists: ${selected.localName}`);
+		}
+
+		if (selected.kind === "remote") {
+			writeLine(
+				io.stderr,
+				`Creating local branch ${selected.localName} tracking ${selected.fullName}...`,
+			);
+			const result = await addTrackedWorktree(
+				targetPath,
+				selected.localName,
+				selected.fullName,
+			);
+			if (result.exitCode !== 0) {
+				writeCapturedOutputTo(io.stderr, result);
+				throw new Error(`Failed to create worktree for ${selected.localName}`);
+			}
+			writeCapturedOutputTo(io.stderr, result);
+		} else {
+			writeLine(
+				io.stderr,
+				`Creating new branch ${selected.localName} from current HEAD...`,
+			);
+			const result = await addNewWorktree(targetPath, selected.localName);
+			if (result.exitCode !== 0) {
+				writeCapturedOutputTo(io.stderr, result);
+				throw new Error(`Failed to create worktree for ${selected.localName}`);
+			}
+			writeCapturedOutputTo(io.stderr, result);
+		}
+
+		writeLine(io.stdout, targetPath);
+		return 0;
+	}
 
 	if (!hasLocal) {
 		if (selected.kind !== "remote") {

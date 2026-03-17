@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import {
 	chmodSync,
+	existsSync,
 	mkdirSync,
 	realpathSync,
 	readFileSync,
@@ -119,6 +120,149 @@ describe("gwt add integration", () => {
 				"HEAD",
 			]).stdout.trim(),
 		).toBe("feature/local-only");
+	});
+
+	test("creates a new branch and worktree from current HEAD with --new", () => {
+		const sandbox = makeTempDir("gwt-add-new-local-integration-");
+		tempDirs.push(sandbox);
+
+		const workspace = join(sandbox, "workspace");
+		runCommand(["git", "init", workspace]);
+		runCommand(["git", "-C", workspace, "config", "user.name", "Test User"]);
+		runCommand(["git", "-C", workspace, "config", "user.email", "test@example.com"]);
+		writeFileSync(join(workspace, "README.md"), "workspace\n");
+		runCommand(["git", "-C", workspace, "add", "README.md"]);
+		runCommand(["git", "-C", workspace, "commit", "-m", "initial commit"]);
+		runCommand(["git", "-C", workspace, "branch", "-M", "main"]);
+
+		const currentHead = runCommand([
+			"git",
+			"-C",
+			workspace,
+			"rev-parse",
+			"HEAD",
+		]).stdout.trim();
+		const expectedPath = buildWorktreePath(
+			realpathSync(workspace),
+			"feature/new-local",
+		);
+
+		const result = runCommand(
+			[process.execPath, "run", script, "add", "--new", "feature/new-local"],
+			{ cwd: workspace },
+		);
+		expect(result.exitCode).toBe(0);
+		expect(result.stdout.trim()).toBe(expectedPath);
+		expect(
+			runCommand([
+				"git",
+				"-C",
+				expectedPath,
+				"rev-parse",
+				"--abbrev-ref",
+				"HEAD",
+			]).stdout.trim(),
+		).toBe("feature/new-local");
+		expect(
+			runCommand(["git", "-C", expectedPath, "rev-parse", "HEAD"]).stdout.trim(),
+		).toBe(currentHead);
+	});
+
+	test("tracks a unique remote branch when creating with --new", () => {
+		const sandbox = makeTempDir("gwt-add-new-remote-integration-");
+		tempDirs.push(sandbox);
+
+		const remote = join(sandbox, "remote.git");
+		const seed = join(sandbox, "seed");
+		const workspace = join(sandbox, "workspace");
+
+		runCommand(["git", "init", "--bare", remote]);
+		runCommand(["git", "clone", remote, seed]);
+		runCommand(["git", "-C", seed, "config", "user.name", "Test User"]);
+		runCommand(["git", "-C", seed, "config", "user.email", "test@example.com"]);
+		runCommand(["git", "-C", seed, "switch", "-c", "main"]);
+		writeFileSync(join(seed, "README.md"), "seed\n");
+		runCommand(["git", "-C", seed, "add", "README.md"]);
+		runCommand(["git", "-C", seed, "commit", "-m", "initial commit"]);
+		runCommand(["git", "-C", seed, "push", "-u", "origin", "main"]);
+		runCommand(["git", "-C", seed, "switch", "-c", "feature/new-remote"]);
+		writeFileSync(join(seed, "feature.txt"), "remote branch\n");
+		runCommand(["git", "-C", seed, "add", "feature.txt"]);
+		runCommand(["git", "-C", seed, "commit", "-m", "add remote branch"]);
+		runCommand(["git", "-C", seed, "push", "-u", "origin", "feature/new-remote"]);
+		const remoteBranchHead = runCommand([
+			"git",
+			"-C",
+			seed,
+			"rev-parse",
+			"feature/new-remote",
+		]).stdout.trim();
+
+		runCommand(["git", "clone", "-b", "main", remote, workspace]);
+
+		const expectedPath = buildWorktreePath(
+			realpathSync(workspace),
+			"feature/new-remote",
+		);
+
+		const result = runCommand(
+			[process.execPath, "run", script, "add", "--new", "feature/new-remote"],
+			{ cwd: workspace },
+		);
+		expect(result.exitCode).toBe(0);
+		expect(result.stdout.trim()).toBe(expectedPath);
+		expect(
+			runCommand([
+				"git",
+				"-C",
+				expectedPath,
+				"rev-parse",
+				"--abbrev-ref",
+				"HEAD",
+			]).stdout.trim(),
+		).toBe("feature/new-remote");
+		expect(
+			runCommand(["git", "-C", expectedPath, "rev-parse", "HEAD"]).stdout.trim(),
+		).toBe(remoteBranchHead);
+		expect(
+			runCommand([
+				"git",
+				"-C",
+				expectedPath,
+				"rev-parse",
+				"--abbrev-ref",
+				"--symbolic-full-name",
+				"@{upstream}",
+			]).stdout.trim(),
+		).toBe("origin/feature/new-remote");
+	});
+
+	test("fails when --new receives an existing local branch name", () => {
+		const sandbox = makeTempDir("gwt-add-new-existing-integration-");
+		tempDirs.push(sandbox);
+
+		const workspace = join(sandbox, "workspace");
+		runCommand(["git", "init", workspace]);
+		runCommand(["git", "-C", workspace, "config", "user.name", "Test User"]);
+		runCommand(["git", "-C", workspace, "config", "user.email", "test@example.com"]);
+		writeFileSync(join(workspace, "README.md"), "workspace\n");
+		runCommand(["git", "-C", workspace, "add", "README.md"]);
+		runCommand(["git", "-C", workspace, "commit", "-m", "initial commit"]);
+		runCommand(["git", "-C", workspace, "branch", "-M", "main"]);
+		runCommand(["git", "-C", workspace, "branch", "feature/existing"]);
+
+		const expectedPath = buildWorktreePath(
+			realpathSync(workspace),
+			"feature/existing",
+		);
+		const result = runCommand(
+			[process.execPath, "run", script, "add", "--new", "feature/existing"],
+			{ check: false, cwd: workspace },
+		);
+
+		expect(result.exitCode).toBe(1);
+		expect(result.stderr).toContain("Local branch already exists: feature/existing");
+		expect(existsSync(expectedPath)).toBe(false);
 	});
 
 	test("creates a worktree from a same-repo PR and filters out cross-repo PRs", () => {

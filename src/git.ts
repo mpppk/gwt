@@ -274,6 +274,13 @@ export async function addWorktree(
 	return await $`git worktree add ${targetPath} ${branchName}`.quiet().nothrow();
 }
 
+export async function addNewWorktree(
+	targetPath: string,
+	branchName: string,
+): Promise<GitCommandResult> {
+	return await $`git worktree add -b ${branchName} ${targetPath}`.quiet().nothrow();
+}
+
 export async function addTrackedWorktree(
 	targetPath: string,
 	localBranchName: string,
