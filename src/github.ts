@@ -25,10 +25,11 @@ export type PullRequestItem = {
 
 const GH_PR_JSON_FIELDS =
 	"number,title,headRefName,author,updatedAt,isCrossRepository";
+const GH_PR_LIST_LIMIT = 200;
 
 export async function listPullRequests(): Promise<PullRequestItem[]> {
 	const raw = (
-		await $`gh pr list --state open --json ${GH_PR_JSON_FIELDS}`.text()
+		await $`gh pr list --state open --limit ${GH_PR_LIST_LIMIT} --json ${GH_PR_JSON_FIELDS}`.text()
 	).trim();
 	if (!raw) {
 		return [];
