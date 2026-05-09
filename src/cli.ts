@@ -130,7 +130,7 @@ function parseAddArgs(args: string[]): ParsedCliAction {
 		const extraArg = args[2];
 
 		if (!branchArg) {
-			throw new UsageError("Missing branch name for gwt add --new.", "add");
+			return { type: "run-add", createNewBranch: true };
 		}
 		if (branchArg.startsWith("-")) {
 			throw new UsageError(`Unknown option: ${branchArg}`, "add");
@@ -234,7 +234,7 @@ export function printMainHelp(writer: CliWriter) {
 	writeLine(writer, "Usage:");
 	writeLine(writer, "  gwt");
 	writeLine(writer, "  gwt add [branch]");
-	writeLine(writer, "  gwt add --new <branch>");
+	writeLine(writer, "  gwt add --new [<branch>]");
 	writeLine(writer, "  gwt add --pr");
 	writeLine(writer, "  gwt remove");
 	writeLine(writer, "  gwt --help");

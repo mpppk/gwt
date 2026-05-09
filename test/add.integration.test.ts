@@ -316,6 +316,94 @@ describe("gwt add integration", () => {
 		expect(existsSync(expectedPath)).toBe(false);
 	});
 
+	test("creates a new branch interactively when no branch arg is given to --new", () => {
+		const sandbox = makeTempDir("gwt-add-new-interactive-integration-");
+		tempDirs.push(sandbox);
+
+		const binDir = join(sandbox, "bin");
+		mkdirSync(binDir, { recursive: true });
+
+		const workspace = join(sandbox, "workspace");
+		runCommand(["git", "init", workspace]);
+		runCommand(["git", "-C", workspace, "config", "user.name", "Test User"]);
+		runCommand([
+			"git",
+			"-C",
+			workspace,
+			"config",
+			"user.email",
+			"test@example.com",
+		]);
+		writeFileSync(join(workspace, "README.md"), "workspace\n");
+		runCommand(["git", "-C", workspace, "add", "README.md"]);
+		runCommand(["git", "-C", workspace, "commit", "-m", "initial commit"]);
+		runCommand(["git", "-C", workspace, "branch", "-M", "main"]);
+
+		const currentHead = runCommand([
+			"git",
+			"-C",
+			workspace,
+			"rev-parse",
+			"HEAD",
+		]).stdout.trim();
+		const expectedPath = buildWorktreePath(
+			realpathSync(workspace),
+			"feature/interactive",
+		);
+
+		const fzfPath = join(binDir, "fzf");
+		writeFileSync(
+			fzfPath,
+			[
+				"#!/bin/sh",
+				"for arg in \"$@\"; do",
+				'  if [ "$arg" = "--print-query" ]; then',
+				'    echo "${GWT_FZF_NEW_BRANCH:-}"',
+				"    exit 1",
+				"  fi",
+				"done",
+				"head -n 1",
+				"",
+			].join("\n"),
+		);
+		chmodSync(fzfPath, 0o755);
+
+		const result = runCommand(
+			[process.execPath, "run", script, "add", "--new"],
+			{
+				check: false,
+				cwd: workspace,
+				env: {
+					...process.env,
+					GWT_FZF_NEW_BRANCH: "feature/interactive",
+					PATH: `${binDir}:${process.env.PATH ?? ""}`,
+				},
+			},
+		);
+
+		expect(result.exitCode).toBe(0);
+		expect(result.stdout.trim()).toBe(expectedPath);
+		expect(
+			runCommand([
+				"git",
+				"-C",
+				expectedPath,
+				"rev-parse",
+				"--abbrev-ref",
+				"HEAD",
+			]).stdout.trim(),
+		).toBe("feature/interactive");
+		expect(
+			runCommand([
+				"git",
+				"-C",
+				expectedPath,
+				"rev-parse",
+				"HEAD",
+			]).stdout.trim(),
+		).toBe(currentHead);
+	});
+
 	test("creates a worktree from a same-repo PR and filters out cross-repo PRs", () => {
 		const sandbox = makeTempDir("gwt-add-pr-integration-");
 		tempDirs.push(sandbox);
@@ -465,6 +553,13 @@ function createPrModeEnv(sandbox: string, query: string, capturePath: string) {
 		fzfPath,
 		[
 			"#!/bin/sh",
+			"# If --print-query is passed, simulate interactive branch name input",
+			"for arg in \"$@\"; do",
+			'  if [ "$arg" = "--print-query" ]; then',
+			'    echo "${GWT_FZF_NEW_BRANCH:-}"',
+			"    exit 1",
+			"  fi",
+			"done",
 			'capture="${GWT_FZF_CAPTURE:-/dev/null}"',
 			'cat | tee "$capture" | {',
 			'  if [ -n "$GWT_FZF_QUERY" ]; then',
