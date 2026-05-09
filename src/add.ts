@@ -36,6 +36,7 @@ export type PullRequestSelectionItem = PullRequestItem & {
 export type SelectPullRequest = (
 	items: PullRequestSelectionItem[],
 ) => Promise<PullRequestSelectionItem | null>;
+export type InputBranchName = () => Promise<string | null>;
 
 type RunAddCommandDependencies = {
 	addNewWorktree: typeof addNewWorktree;
@@ -56,6 +57,7 @@ export type RunAddCommandOptions = {
 	branchArg?: string;
 	createNewBranch?: boolean;
 	deps?: Partial<RunAddCommandDependencies>;
+	inputBranchName?: InputBranchName;
 	io?: CliIO;
 	selectBranch?: SelectBranch;
 	selectPullRequest?: SelectPullRequest;
@@ -81,6 +83,7 @@ export async function runAddCommand({
 	branchArg,
 	createNewBranch = false,
 	deps = {},
+	inputBranchName = inputBranchNameInteractive,
 	io = defaultIO,
 	selectBranch = selectBranchInteractive,
 	selectPullRequest = selectPullRequestInteractive,
@@ -88,9 +91,6 @@ export async function runAddCommand({
 }: RunAddCommandOptions = {}): Promise<number> {
 	if (usePullRequests && branchArg) {
 		throw new Error("`branchArg` cannot be used with `usePullRequests`.");
-	}
-	if (createNewBranch && !branchArg) {
-		throw new Error("`branchArg` is required when `createNewBranch` is true.");
 	}
 	if (createNewBranch && usePullRequests) {
 		throw new Error("`createNewBranch` cannot be used with `usePullRequests`.");
@@ -111,7 +111,8 @@ export async function runAddCommand({
 
 	const selected = createNewBranch
 		? await selectBranchForNewMode({
-				branchArg: branchArg ?? "",
+				branchArg,
+				inputBranchName,
 				listBranches: resolvedDeps.listBranches,
 			})
 		: usePullRequests
@@ -162,7 +163,7 @@ export function printAddHelp(writer: CliWriter) {
 	writeLine(writer, "Usage:");
 	writeLine(writer, "  gwt add");
 	writeLine(writer, "  gwt add <branch>");
-	writeLine(writer, "  gwt add --new <branch>");
+	writeLine(writer, "  gwt add --new [<branch>]");
 	writeLine(writer, "  gwt add --pr");
 	writeLine(writer);
 	writeLine(writer, "Options:");
@@ -181,7 +182,11 @@ export function printAddHelp(writer: CliWriter) {
 	writeLine(writer, "  2. exact remote branch name, e.g. origin/feature/foo");
 	writeLine(writer, "  3. a unique remote branch whose short name matches");
 	writeLine(writer);
-	writeLine(writer, "New mode (`--new <branch>`):");
+	writeLine(writer, "New mode (`--new [<branch>]`):");
+	writeLine(
+		writer,
+		"  - If no branch name is given, prompts for one interactively via fzf.",
+	);
 	writeLine(writer, "  - Fails if the local branch already exists.");
 	writeLine(
 		writer,
@@ -242,6 +247,33 @@ export async function selectPullRequestInteractive(
 	}
 }
 
+export async function inputBranchNameInteractive(): Promise<string | null> {
+	try {
+		return (
+			(
+				await $`fzf --layout=reverse --height=80% --prompt='new branch> ' --print-query < /dev/null`.text()
+			).trim() || null
+		);
+	} catch (error: unknown) {
+		// fzf is given no input items (< /dev/null) so it always exits with code 1
+		// when the user types a query and presses Enter. --print-query makes the
+		// typed text available in stdout even on a non-zero exit.
+		if (
+			error !== null &&
+			typeof error === "object" &&
+			"exitCode" in error &&
+			(error as { exitCode: number }).exitCode === 1 &&
+			"stdout" in error
+		) {
+			const text = new TextDecoder()
+				.decode((error as { stdout: Uint8Array }).stdout)
+				.trim();
+			return text || null;
+		}
+		return null;
+	}
+}
+
 async function selectBranchFromBranches({
 	branchArg,
 	listBranches,
@@ -265,19 +297,27 @@ async function selectBranchFromBranches({
 
 async function selectBranchForNewMode({
 	branchArg,
+	inputBranchName,
 	listBranches,
 }: {
-	branchArg: string;
+	branchArg?: string;
+	inputBranchName: InputBranchName;
 	listBranches: () => Promise<BranchItem[]>;
-}): Promise<BranchItem> {
+}): Promise<BranchItem | null> {
+	const resolvedBranchArg = branchArg ?? (await inputBranchName());
+	if (!resolvedBranchArg) {
+		return null;
+	}
+
 	const branches = await listBranches();
-	const explicitRemoteName = getExplicitRemoteName(branchArg, branches);
+	const explicitRemoteName = getExplicitRemoteName(resolvedBranchArg, branches);
 	if (explicitRemoteName) {
 		const remoteMatch = branches.find(
-			(branch) => branch.kind === "remote" && branch.fullName === branchArg,
+			(branch) =>
+				branch.kind === "remote" && branch.fullName === resolvedBranchArg,
 		);
 		if (!remoteMatch) {
-			throw new Error(`Remote branch not found: ${branchArg}`);
+			throw new Error(`Remote branch not found: ${resolvedBranchArg}`);
 		}
 		if (hasLocalBranch(branches, remoteMatch.localName)) {
 			throw new Error(`Local branch already exists: ${remoteMatch.localName}`);
@@ -285,19 +325,19 @@ async function selectBranchForNewMode({
 		return remoteMatch;
 	}
 
-	if (hasLocalBranch(branches, branchArg)) {
-		throw new Error(`Local branch already exists: ${branchArg}`);
+	if (hasLocalBranch(branches, resolvedBranchArg)) {
+		throw new Error(`Local branch already exists: ${resolvedBranchArg}`);
 	}
 
 	try {
-		return resolveBranchArgument(branchArg, branches);
+		return resolveBranchArgument(resolvedBranchArg, branches);
 	} catch (error) {
-		if (!isBranchNotFoundError(error, branchArg)) {
+		if (!isBranchNotFoundError(error, resolvedBranchArg)) {
 			throw error;
 		}
 	}
 
-	return buildNewLocalBranchItem(branchArg);
+	return buildNewLocalBranchItem(resolvedBranchArg);
 }
 
 async function selectBranchFromPullRequests({

@@ -262,7 +262,7 @@ describe("runAddCommand PR mode", () => {
 });
 
 describe("runAddCommand --new mode", () => {
-	test("does not require fzf when creating a new branch", async () => {
+	test("does not require fzf when creating a new branch with a branch arg", async () => {
 		const io = createBufferedIO();
 		const commands: string[] = [];
 
@@ -280,6 +280,26 @@ describe("runAddCommand --new mode", () => {
 
 		expect(exitCode).toBe(0);
 		expect(commands).toEqual(["git"]);
+	});
+
+	test("requires fzf when creating a new branch without a branch arg", async () => {
+		const io = createBufferedIO();
+		const commands: string[] = [];
+
+		const exitCode = await runAddCommand({
+			createNewBranch: true,
+			io,
+			deps: createDeps({
+				assertCommand: async (cmd) => {
+					commands.push(cmd);
+				},
+				listBranches: async () => [],
+			}),
+			inputBranchName: async () => "feature/new-interactive",
+		});
+
+		expect(exitCode).toBe(0);
+		expect(commands).toContain("fzf");
 	});
 
 	test("creates a new local branch from current HEAD when no remote matches", async () => {
@@ -456,5 +476,50 @@ describe("runAddCommand --new mode", () => {
 				"Remote branch not found: origin/feature/missing",
 			);
 		}
+	});
+
+	test("interactively inputs branch name when no branchArg is given", async () => {
+		const io = createBufferedIO();
+		let addNewCall:
+			| {
+					branchName: string;
+					targetPath: string;
+			  }
+			| undefined;
+
+		const exitCode = await runAddCommand({
+			createNewBranch: true,
+			io,
+			deps: createDeps({
+				addNewWorktree: async (targetPath, branchName) => {
+					addNewCall = { branchName, targetPath };
+					return result();
+				},
+				listBranches: async () => [],
+			}),
+			inputBranchName: async () => "feature/interactive-new",
+		});
+
+		expect(exitCode).toBe(0);
+		expect(addNewCall).toEqual({
+			branchName: "feature/interactive-new",
+			targetPath: "/repo.worktrees/feature-interactive-new",
+		});
+		expect(io.readStdout().trim()).toBe(
+			"/repo.worktrees/feature-interactive-new",
+		);
+	});
+
+	test("returns 130 when interactive branch name input is cancelled", async () => {
+		const io = createBufferedIO();
+
+		const exitCode = await runAddCommand({
+			createNewBranch: true,
+			io,
+			deps: createDeps(),
+			inputBranchName: async () => null,
+		});
+
+		expect(exitCode).toBe(130);
 	});
 });
