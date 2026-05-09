@@ -1,7 +1,6 @@
 import { createInterface } from "node:readline/promises";
 import { $ } from "bun";
 import {
-	type WorktreeInfo,
 	assertCommand,
 	assertGitRepo,
 	deleteLocalBranch,
@@ -13,6 +12,7 @@ import {
 	isWorktreeDirty,
 	listWorktrees,
 	removeWorktree,
+	type WorktreeInfo,
 	writeCapturedOutputTo,
 } from "./git.ts";
 import { type CliIO, type CliWriter, defaultIO, writeLine } from "./io.ts";

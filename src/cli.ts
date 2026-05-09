@@ -1,12 +1,12 @@
 import {
-	type RunAddCommandOptions,
 	printAddHelp,
+	type RunAddCommandOptions,
 	runAddCommand,
 } from "./add.ts";
 import { type CliIO, type CliWriter, defaultIO, writeLine } from "./io.ts";
 import {
-	type RunRemoveCommandOptions,
 	printRemoveHelp,
+	type RunRemoveCommandOptions,
 	runRemoveCommand,
 } from "./remove.ts";
 

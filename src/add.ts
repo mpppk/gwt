@@ -1,28 +1,28 @@
 import { $ } from "bun";
 import {
-	type BranchItem,
-	type GitCommandResult,
-	type WorktreeInfo,
 	addNewWorktree,
 	addTrackedWorktree,
 	addWorktree,
 	assertCommand,
 	assertGitRepo,
+	type BranchItem,
 	buildWorktreePath,
 	ensureParentDir,
 	fetchRemoteBranch,
 	findWorktreeByBranch,
+	type GitCommandResult,
 	getMainWorktreeRoot,
 	listBranches,
 	listWorktrees,
 	localBranchExists,
 	resolveBranchArgument,
+	type WorktreeInfo,
 	writeCapturedOutputTo,
 } from "./git.ts";
 import {
-	type PullRequestItem,
 	formatPullRequestDisplay,
 	listPullRequests,
+	type PullRequestItem,
 } from "./github.ts";
 import { type CliIO, type CliWriter, defaultIO, writeLine } from "./io.ts";
 
