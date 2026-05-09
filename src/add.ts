@@ -250,8 +250,9 @@ export async function inputBranchNameInteractive(): Promise<string | null> {
 			await $`fzf --layout=reverse --height=80% --prompt='new branch> ' --print-query < /dev/null`.text()
 		).trim() || null;
 	} catch (error: unknown) {
-		// fzf exits with code 1 when the user types a query but no items exist to
-		// select. In this case, --print-query makes the typed text available in stdout.
+		// fzf is given no input items (< /dev/null) so it always exits with code 1
+		// when the user types a query and presses Enter. --print-query makes the
+		// typed text available in stdout even on a non-zero exit.
 		if (
 			error !== null &&
 			typeof error === "object" &&
