@@ -356,7 +356,7 @@ describe("gwt add integration", () => {
 			fzfPath,
 			[
 				"#!/bin/sh",
-				"for arg in \"$@\"; do",
+				'for arg in "$@"; do',
 				'  if [ "$arg" = "--print-query" ]; then',
 				'    echo "${GWT_FZF_NEW_BRANCH:-}"',
 				"    exit 1",
@@ -554,7 +554,7 @@ function createPrModeEnv(sandbox: string, query: string, capturePath: string) {
 		[
 			"#!/bin/sh",
 			"# If --print-query is passed, simulate interactive branch name input",
-			"for arg in \"$@\"; do",
+			'for arg in "$@"; do',
 			'  if [ "$arg" = "--print-query" ]; then',
 			'    echo "${GWT_FZF_NEW_BRANCH:-}"',
 			"    exit 1",

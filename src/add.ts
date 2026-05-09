@@ -183,7 +183,10 @@ export function printAddHelp(writer: CliWriter) {
 	writeLine(writer, "  3. a unique remote branch whose short name matches");
 	writeLine(writer);
 	writeLine(writer, "New mode (`--new [<branch>]`):");
-	writeLine(writer, "  - If no branch name is given, prompts for one interactively via fzf.");
+	writeLine(
+		writer,
+		"  - If no branch name is given, prompts for one interactively via fzf.",
+	);
 	writeLine(writer, "  - Fails if the local branch already exists.");
 	writeLine(
 		writer,
@@ -247,8 +250,10 @@ export async function selectPullRequestInteractive(
 export async function inputBranchNameInteractive(): Promise<string | null> {
 	try {
 		return (
-			await $`fzf --layout=reverse --height=80% --prompt='new branch> ' --print-query < /dev/null`.text()
-		).trim() || null;
+			(
+				await $`fzf --layout=reverse --height=80% --prompt='new branch> ' --print-query < /dev/null`.text()
+			).trim() || null
+		);
 	} catch (error: unknown) {
 		// fzf is given no input items (< /dev/null) so it always exits with code 1
 		// when the user types a query and presses Enter. --print-query makes the
@@ -308,7 +313,8 @@ async function selectBranchForNewMode({
 	const explicitRemoteName = getExplicitRemoteName(resolvedBranchArg, branches);
 	if (explicitRemoteName) {
 		const remoteMatch = branches.find(
-			(branch) => branch.kind === "remote" && branch.fullName === resolvedBranchArg,
+			(branch) =>
+				branch.kind === "remote" && branch.fullName === resolvedBranchArg,
 		);
 		if (!remoteMatch) {
 			throw new Error(`Remote branch not found: ${resolvedBranchArg}`);

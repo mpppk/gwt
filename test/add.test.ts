@@ -505,7 +505,9 @@ describe("runAddCommand --new mode", () => {
 			branchName: "feature/interactive-new",
 			targetPath: "/repo.worktrees/feature-interactive-new",
 		});
-		expect(io.readStdout().trim()).toBe("/repo.worktrees/feature-interactive-new");
+		expect(io.readStdout().trim()).toBe(
+			"/repo.worktrees/feature-interactive-new",
+		);
 	});
 
 	test("returns 130 when interactive branch name input is cancelled", async () => {
