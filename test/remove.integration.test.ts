@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { chmodSync, existsSync, mkdirSync, realpathSync, writeFileSync } from "node:fs";
+import {
+	chmodSync,
+	existsSync,
+	mkdirSync,
+	realpathSync,
+	writeFileSync,
+} from "node:fs";
 import { join, resolve } from "node:path";
 import { makeTempDir, removeTempDir, runCommand } from "./helpers.ts";
 
@@ -22,7 +28,15 @@ describe("gwt remove integration", () => {
 
 		setupLocalRepo(workspace);
 		runCommand(["git", "-C", workspace, "branch", "feature/clean"]);
-		runCommand(["git", "-C", workspace, "worktree", "add", worktreePath, "feature/clean"]);
+		runCommand([
+			"git",
+			"-C",
+			workspace,
+			"worktree",
+			"add",
+			worktreePath,
+			"feature/clean",
+		]);
 		const expectedPath = realpathSync(worktreePath);
 
 		const result = runCommand([process.execPath, "run", script, "remove"], {
@@ -46,7 +60,15 @@ describe("gwt remove integration", () => {
 
 		setupLocalRepo(workspace);
 		runCommand(["git", "-C", workspace, "branch", "feature/dirty"]);
-		runCommand(["git", "-C", workspace, "worktree", "add", worktreePath, "feature/dirty"]);
+		runCommand([
+			"git",
+			"-C",
+			workspace,
+			"worktree",
+			"add",
+			worktreePath,
+			"feature/dirty",
+		]);
 		writeFileSync(join(worktreePath, "notes.txt"), "dirty\n");
 
 		const result = runCommand([process.execPath, "run", script, "remove"], {
@@ -89,7 +111,14 @@ describe("gwt remove integration", () => {
 
 		runCommand(["git", "clone", "-b", "main", remote, workspace]);
 		runCommand(["git", "-C", workspace, "config", "user.name", "Test User"]);
-		runCommand(["git", "-C", workspace, "config", "user.email", "test@example.com"]);
+		runCommand([
+			"git",
+			"-C",
+			workspace,
+			"config",
+			"user.email",
+			"test@example.com",
+		]);
 		runCommand([
 			"git",
 			"-C",
@@ -159,7 +188,14 @@ describe("gwt remove integration", () => {
 function setupLocalRepo(workspace: string) {
 	runCommand(["git", "init", workspace]);
 	runCommand(["git", "-C", workspace, "config", "user.name", "Test User"]);
-	runCommand(["git", "-C", workspace, "config", "user.email", "test@example.com"]);
+	runCommand([
+		"git",
+		"-C",
+		workspace,
+		"config",
+		"user.email",
+		"test@example.com",
+	]);
 	writeFileSync(join(workspace, "README.md"), "workspace\n");
 	runCommand(["git", "-C", workspace, "add", "README.md"]);
 	runCommand(["git", "-C", workspace, "commit", "-m", "initial commit"]);

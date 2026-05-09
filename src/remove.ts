@@ -1,6 +1,7 @@
-import { $ } from "bun";
 import { createInterface } from "node:readline/promises";
+import { $ } from "bun";
 import {
+	type WorktreeInfo,
 	assertCommand,
 	assertGitRepo,
 	deleteLocalBranch,
@@ -13,9 +14,8 @@ import {
 	listWorktrees,
 	removeWorktree,
 	writeCapturedOutputTo,
-	type WorktreeInfo,
 } from "./git.ts";
-import { defaultIO, writeLine, type CliIO, type CliWriter } from "./io.ts";
+import { type CliIO, type CliWriter, defaultIO, writeLine } from "./io.ts";
 
 $.throws(true);
 
@@ -135,7 +135,9 @@ export async function runRemoveCommand({
 	writeLine(io.stdout, selected.path);
 
 	writeLine(io.stderr, `Deleting branch ${selected.branchName}...`);
-	const deleteResult = await resolvedDeps.deleteLocalBranch(selected.branchName);
+	const deleteResult = await resolvedDeps.deleteLocalBranch(
+		selected.branchName,
+	);
 	if (deleteResult.exitCode !== 0) {
 		writeCapturedOutputTo(io.stderr, deleteResult);
 		writeLine(
@@ -251,7 +253,10 @@ function buildRemovableWorktrees(
 	const result: RemovableWorktree[] = [];
 
 	for (const worktree of worktrees) {
-		if (worktree.path === currentWorktreeRoot || worktree.path === mainWorktreeRoot) {
+		if (
+			worktree.path === currentWorktreeRoot ||
+			worktree.path === mainWorktreeRoot
+		) {
 			continue;
 		}
 		if (worktree.bare || worktree.detached) {

@@ -1,7 +1,7 @@
 import { spawnSync } from "node:child_process";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { mkdtempSync, rmSync } from "node:fs";
 import type { CliIO } from "../src/io.ts";
 
 type BufferedIO = CliIO & {

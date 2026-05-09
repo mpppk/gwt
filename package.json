@@ -6,9 +6,12 @@
 	},
 	"module": "index.ts",
 	"scripts": {
-		"lint:type": "bunx tsc --noEmit"
+		"lint:type": "bunx tsc --noEmit",
+		"lint": "bunx biome lint .",
+		"fmt": "bunx biome format ."
 	},
 	"devDependencies": {
+		"@biomejs/biome": "1.9.4",
 		"@types/bun": "latest"
 	},
 	"private": true,

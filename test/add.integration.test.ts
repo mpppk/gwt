@@ -3,8 +3,8 @@ import {
 	chmodSync,
 	existsSync,
 	mkdirSync,
-	realpathSync,
 	readFileSync,
+	realpathSync,
 	writeFileSync,
 } from "node:fs";
 import { join, resolve } from "node:path";
@@ -42,7 +42,15 @@ describe("gwt add integration", () => {
 		writeFileSync(join(seed, "feature.txt"), "remote branch\n");
 		runCommand(["git", "-C", seed, "add", "feature.txt"]);
 		runCommand(["git", "-C", seed, "commit", "-m", "add remote-only branch"]);
-		runCommand(["git", "-C", seed, "push", "-u", "origin", "feature/remote-only"]);
+		runCommand([
+			"git",
+			"-C",
+			seed,
+			"push",
+			"-u",
+			"origin",
+			"feature/remote-only",
+		]);
 
 		runCommand(["git", "clone", "-b", "main", remote, workspace]);
 
@@ -83,7 +91,14 @@ describe("gwt add integration", () => {
 		const workspace = join(sandbox, "workspace");
 		runCommand(["git", "init", workspace]);
 		runCommand(["git", "-C", workspace, "config", "user.name", "Test User"]);
-		runCommand(["git", "-C", workspace, "config", "user.email", "test@example.com"]);
+		runCommand([
+			"git",
+			"-C",
+			workspace,
+			"config",
+			"user.email",
+			"test@example.com",
+		]);
 		writeFileSync(join(workspace, "README.md"), "workspace\n");
 		runCommand(["git", "-C", workspace, "add", "README.md"]);
 		runCommand(["git", "-C", workspace, "commit", "-m", "initial commit"]);
@@ -129,7 +144,14 @@ describe("gwt add integration", () => {
 		const workspace = join(sandbox, "workspace");
 		runCommand(["git", "init", workspace]);
 		runCommand(["git", "-C", workspace, "config", "user.name", "Test User"]);
-		runCommand(["git", "-C", workspace, "config", "user.email", "test@example.com"]);
+		runCommand([
+			"git",
+			"-C",
+			workspace,
+			"config",
+			"user.email",
+			"test@example.com",
+		]);
 		writeFileSync(join(workspace, "README.md"), "workspace\n");
 		runCommand(["git", "-C", workspace, "add", "README.md"]);
 		runCommand(["git", "-C", workspace, "commit", "-m", "initial commit"]);
@@ -164,7 +186,13 @@ describe("gwt add integration", () => {
 			]).stdout.trim(),
 		).toBe("feature/new-local");
 		expect(
-			runCommand(["git", "-C", expectedPath, "rev-parse", "HEAD"]).stdout.trim(),
+			runCommand([
+				"git",
+				"-C",
+				expectedPath,
+				"rev-parse",
+				"HEAD",
+			]).stdout.trim(),
 		).toBe(currentHead);
 	});
 
@@ -189,7 +217,15 @@ describe("gwt add integration", () => {
 		writeFileSync(join(seed, "feature.txt"), "remote branch\n");
 		runCommand(["git", "-C", seed, "add", "feature.txt"]);
 		runCommand(["git", "-C", seed, "commit", "-m", "add remote branch"]);
-		runCommand(["git", "-C", seed, "push", "-u", "origin", "feature/new-remote"]);
+		runCommand([
+			"git",
+			"-C",
+			seed,
+			"push",
+			"-u",
+			"origin",
+			"feature/new-remote",
+		]);
 		const remoteBranchHead = runCommand([
 			"git",
 			"-C",
@@ -222,7 +258,13 @@ describe("gwt add integration", () => {
 			]).stdout.trim(),
 		).toBe("feature/new-remote");
 		expect(
-			runCommand(["git", "-C", expectedPath, "rev-parse", "HEAD"]).stdout.trim(),
+			runCommand([
+				"git",
+				"-C",
+				expectedPath,
+				"rev-parse",
+				"HEAD",
+			]).stdout.trim(),
 		).toBe(remoteBranchHead);
 		expect(
 			runCommand([
@@ -244,7 +286,14 @@ describe("gwt add integration", () => {
 		const workspace = join(sandbox, "workspace");
 		runCommand(["git", "init", workspace]);
 		runCommand(["git", "-C", workspace, "config", "user.name", "Test User"]);
-		runCommand(["git", "-C", workspace, "config", "user.email", "test@example.com"]);
+		runCommand([
+			"git",
+			"-C",
+			workspace,
+			"config",
+			"user.email",
+			"test@example.com",
+		]);
 		writeFileSync(join(workspace, "README.md"), "workspace\n");
 		runCommand(["git", "-C", workspace, "add", "README.md"]);
 		runCommand(["git", "-C", workspace, "commit", "-m", "initial commit"]);
@@ -261,7 +310,9 @@ describe("gwt add integration", () => {
 		);
 
 		expect(result.exitCode).toBe(1);
-		expect(result.stderr).toContain("Local branch already exists: feature/existing");
+		expect(result.stderr).toContain(
+			"Local branch already exists: feature/existing",
+		);
 		expect(existsSync(expectedPath)).toBe(false);
 	});
 
@@ -285,13 +336,28 @@ describe("gwt add integration", () => {
 		runCommand(["git", "-C", seed, "push", "-u", "origin", "main"]);
 		runCommand(["git", "clone", "-b", "main", remote, workspace]);
 		runCommand(["git", "-C", workspace, "config", "user.name", "Test User"]);
-		runCommand(["git", "-C", workspace, "config", "user.email", "test@example.com"]);
+		runCommand([
+			"git",
+			"-C",
+			workspace,
+			"config",
+			"user.email",
+			"test@example.com",
+		]);
 
 		runCommand(["git", "-C", seed, "switch", "-c", "feature/pr-remote"]);
 		writeFileSync(join(seed, "pr.txt"), "pr branch\n");
 		runCommand(["git", "-C", seed, "add", "pr.txt"]);
 		runCommand(["git", "-C", seed, "commit", "-m", "add PR branch"]);
-		runCommand(["git", "-C", seed, "push", "-u", "origin", "feature/pr-remote"]);
+		runCommand([
+			"git",
+			"-C",
+			seed,
+			"push",
+			"-u",
+			"origin",
+			"feature/pr-remote",
+		]);
 
 		writePullRequestJson(join(sandbox, "prs.json"), [
 			makePullRequestJson(1, "feature/pr-remote", "Same repo PR", false),
@@ -302,11 +368,14 @@ describe("gwt add integration", () => {
 			realpathSync(workspace),
 			"feature/pr-remote",
 		);
-		const result = runCommand([process.execPath, "run", script, "add", "--pr"], {
-			check: false,
-			cwd: workspace,
-			env: createPrModeEnv(sandbox, "Same repo PR", capturePath),
-		});
+		const result = runCommand(
+			[process.execPath, "run", script, "add", "--pr"],
+			{
+				check: false,
+				cwd: workspace,
+				env: createPrModeEnv(sandbox, "Same repo PR", capturePath),
+			},
+		);
 
 		expect(result.exitCode).toBe(0);
 		expect(result.stdout.trim()).toBe(expectedPath);
@@ -336,7 +405,14 @@ describe("gwt add integration", () => {
 
 		runCommand(["git", "init", workspace]);
 		runCommand(["git", "-C", workspace, "config", "user.name", "Test User"]);
-		runCommand(["git", "-C", workspace, "config", "user.email", "test@example.com"]);
+		runCommand([
+			"git",
+			"-C",
+			workspace,
+			"config",
+			"user.email",
+			"test@example.com",
+		]);
 		writeFileSync(join(workspace, "README.md"), "workspace\n");
 		runCommand(["git", "-C", workspace, "add", "README.md"]);
 		runCommand(["git", "-C", workspace, "commit", "-m", "initial commit"]);
@@ -355,14 +431,22 @@ describe("gwt add integration", () => {
 		]);
 
 		writePullRequestJson(join(sandbox, "prs.json"), [
-			makePullRequestJson(10, "feature/pr-existing", "Existing worktree PR", false),
+			makePullRequestJson(
+				10,
+				"feature/pr-existing",
+				"Existing worktree PR",
+				false,
+			),
 		]);
 
-		const result = runCommand([process.execPath, "run", script, "add", "--pr"], {
-			check: false,
-			cwd: workspace,
-			env: createPrModeEnv(sandbox, "Existing worktree PR", capturePath),
-		});
+		const result = runCommand(
+			[process.execPath, "run", script, "add", "--pr"],
+			{
+				check: false,
+				cwd: workspace,
+				env: createPrModeEnv(sandbox, "Existing worktree PR", capturePath),
+			},
+		);
 
 		expect(result.exitCode).toBe(0);
 		expect(result.stdout.trim()).toBe(realpathSync(existingPath));
@@ -372,11 +456,7 @@ describe("gwt add integration", () => {
 	});
 });
 
-function createPrModeEnv(
-	sandbox: string,
-	query: string,
-	capturePath: string,
-) {
+function createPrModeEnv(sandbox: string, query: string, capturePath: string) {
 	const binDir = join(sandbox, "bin");
 	mkdirSync(binDir, { recursive: true });
 

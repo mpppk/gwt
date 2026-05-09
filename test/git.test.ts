@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import {
+	type BranchItem,
 	buildWorktreePath,
 	resolveBranchArgument,
 	sanitizeWorktreeDirName,
-	type BranchItem,
 } from "../src/git.ts";
 
 function makeBranch(
@@ -36,7 +36,9 @@ describe("resolveBranchArgument", () => {
 	test("accepts an exact remote branch match", () => {
 		const remote = makeBranch("remote", "origin/feature/topic");
 
-		expect(resolveBranchArgument("origin/feature/topic", [remote])).toBe(remote);
+		expect(resolveBranchArgument("origin/feature/topic", [remote])).toBe(
+			remote,
+		);
 	});
 
 	test("accepts a unique remote short-name match", () => {

@@ -233,7 +233,10 @@ export function getLocalBranchName(branchRef?: string): string | null {
 	return branchRef.slice("refs/heads/".length);
 }
 
-export function buildWorktreePath(repoRoot: string, branchName: string): string {
+export function buildWorktreePath(
+	repoRoot: string,
+	branchName: string,
+): string {
 	const repoName = basename(repoRoot);
 	const parent = dirname(repoRoot);
 	const dirName = sanitizeWorktreeDirName(branchName);
@@ -271,14 +274,18 @@ export async function addWorktree(
 	targetPath: string,
 	branchName: string,
 ): Promise<GitCommandResult> {
-	return await $`git worktree add ${targetPath} ${branchName}`.quiet().nothrow();
+	return await $`git worktree add ${targetPath} ${branchName}`
+		.quiet()
+		.nothrow();
 }
 
 export async function addNewWorktree(
 	targetPath: string,
 	branchName: string,
 ): Promise<GitCommandResult> {
-	return await $`git worktree add -b ${branchName} ${targetPath}`.quiet().nothrow();
+	return await $`git worktree add -b ${branchName} ${targetPath}`
+		.quiet()
+		.nothrow();
 }
 
 export async function addTrackedWorktree(
@@ -286,7 +293,9 @@ export async function addTrackedWorktree(
 	localBranchName: string,
 	remoteBranchName: string,
 ): Promise<GitCommandResult> {
-	return await $`git worktree add ${targetPath} --track -b ${localBranchName} ${remoteBranchName}`.quiet().nothrow();
+	return await $`git worktree add ${targetPath} --track -b ${localBranchName} ${remoteBranchName}`
+		.quiet()
+		.nothrow();
 }
 
 export async function fetchRemoteBranch(
@@ -305,7 +314,10 @@ export async function isWorktreeDirty(path: string): Promise<boolean> {
 }
 
 export async function getAheadCount(path: string): Promise<number> {
-	const upstreamResult = await $`git -C ${path} rev-parse --abbrev-ref --symbolic-full-name ${"@{upstream}"}`.quiet().nothrow();
+	const upstreamResult =
+		await $`git -C ${path} rev-parse --abbrev-ref --symbolic-full-name ${"@{upstream}"}`
+			.quiet()
+			.nothrow();
 	if (upstreamResult.exitCode !== 0) {
 		return 0;
 	}
@@ -373,8 +385,9 @@ export function resolveBranchArgument(
 	const remoteShortMatches = branches.filter(
 		(branch) => branch.kind === "remote" && branch.localName === branchArg,
 	);
-	if (remoteShortMatches.length === 1) {
-		return remoteShortMatches[0]!;
+	const singleRemoteShortMatch = remoteShortMatches[0];
+	if (remoteShortMatches.length === 1 && singleRemoteShortMatch !== undefined) {
+		return singleRemoteShortMatch;
 	}
 	if (remoteShortMatches.length > 1) {
 		const candidates = remoteShortMatches
