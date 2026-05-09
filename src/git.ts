@@ -373,8 +373,9 @@ export function resolveBranchArgument(
 	const remoteShortMatches = branches.filter(
 		(branch) => branch.kind === "remote" && branch.localName === branchArg,
 	);
-	if (remoteShortMatches.length === 1) {
-		return remoteShortMatches[0]!;
+	const singleRemoteShortMatch = remoteShortMatches[0];
+	if (remoteShortMatches.length === 1 && singleRemoteShortMatch !== undefined) {
+		return singleRemoteShortMatch;
 	}
 	if (remoteShortMatches.length > 1) {
 		const candidates = remoteShortMatches
