@@ -1,10 +1,14 @@
-import { printAddHelp, runAddCommand, type RunAddCommandOptions } from "./add.ts";
 import {
+	type RunAddCommandOptions,
+	printAddHelp,
+	runAddCommand,
+} from "./add.ts";
+import { type CliIO, type CliWriter, defaultIO, writeLine } from "./io.ts";
+import {
+	type RunRemoveCommandOptions,
 	printRemoveHelp,
 	runRemoveCommand,
-	type RunRemoveCommandOptions,
 } from "./remove.ts";
-import { defaultIO, writeLine, type CliIO, type CliWriter } from "./io.ts";
 
 type ParsedCliAction =
 	| { type: "main-help" }
@@ -135,7 +139,10 @@ function parseAddArgs(args: string[]): ParsedCliAction {
 			if (extraArg.startsWith("-")) {
 				throw new UsageError(`Unknown option: ${extraArg}`, "add");
 			}
-			throw new UsageError(`Too many arguments for gwt add: ${extraArg}`, "add");
+			throw new UsageError(
+				`Too many arguments for gwt add: ${extraArg}`,
+				"add",
+			);
 		}
 
 		return { type: "run-add", branchArg, createNewBranch: true };
@@ -155,7 +162,10 @@ function parseAddArgs(args: string[]): ParsedCliAction {
 			if (extraArg.startsWith("-")) {
 				throw new UsageError(`Unknown option: ${extraArg}`, "add");
 			}
-			throw new UsageError(`Too many arguments for gwt add: ${extraArg}`, "add");
+			throw new UsageError(
+				`Too many arguments for gwt add: ${extraArg}`,
+				"add",
+			);
 		}
 		throw new UsageError("Unknown option: --pr", "add");
 	}
@@ -194,7 +204,10 @@ function parseRemoveArgs(args: string[]): ParsedCliAction {
 		throw new UsageError(`Unknown option: ${onlyArg}`, "remove");
 	}
 
-	throw new UsageError(`Too many arguments for gwt remove: ${onlyArg}`, "remove");
+	throw new UsageError(
+		`Too many arguments for gwt remove: ${onlyArg}`,
+		"remove",
+	);
 }
 
 function isHelpFlag(value: string) {
@@ -228,7 +241,10 @@ export function printMainHelp(writer: CliWriter) {
 	writeLine(writer);
 	writeLine(writer, "Commands:");
 	writeLine(writer, "  add     Create, reuse, or start a new branch worktree.");
-	writeLine(writer, "  remove  Remove a linked worktree and delete its branch.");
+	writeLine(
+		writer,
+		"  remove  Remove a linked worktree and delete its branch.",
+	);
 	writeLine(writer);
 	writeLine(writer, "Notes:");
 	writeLine(writer, "  Running bare `gwt` is equivalent to `gwt add`.");

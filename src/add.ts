@@ -1,10 +1,8 @@
 import { $ } from "bun";
 import {
-	formatPullRequestDisplay,
-	listPullRequests,
-	type PullRequestItem,
-} from "./github.ts";
-import {
+	type BranchItem,
+	type GitCommandResult,
+	type WorktreeInfo,
 	addNewWorktree,
 	addTrackedWorktree,
 	addWorktree,
@@ -20,11 +18,13 @@ import {
 	localBranchExists,
 	resolveBranchArgument,
 	writeCapturedOutputTo,
-	type BranchItem,
-	type GitCommandResult,
-	type WorktreeInfo,
 } from "./git.ts";
-import { defaultIO, writeLine, type CliIO, type CliWriter } from "./io.ts";
+import {
+	type PullRequestItem,
+	formatPullRequestDisplay,
+	listPullRequests,
+} from "./github.ts";
+import { type CliIO, type CliWriter, defaultIO, writeLine } from "./io.ts";
 
 $.throws(true);
 
@@ -116,13 +116,13 @@ export async function runAddCommand({
 			})
 		: usePullRequests
 			? await selectBranchFromPullRequests({
-				io,
-				listBranches: resolvedDeps.listBranches,
-				listPullRequests: resolvedDeps.listPullRequests,
-				selectPullRequest,
-				worktrees,
-				fetchRemoteBranch: resolvedDeps.fetchRemoteBranch,
-			})
+					io,
+					listBranches: resolvedDeps.listBranches,
+					listPullRequests: resolvedDeps.listPullRequests,
+					selectPullRequest,
+					worktrees,
+					fetchRemoteBranch: resolvedDeps.fetchRemoteBranch,
+				})
 			: await selectBranchFromBranches({
 					branchArg,
 					listBranches: resolvedDeps.listBranches,
@@ -171,7 +171,10 @@ export function printAddHelp(writer: CliWriter) {
 		writer,
 		"  --new       Create a new branch and worktree for the given branch name.",
 	);
-	writeLine(writer, "  --pr        Select an open same-repo GitHub PR via fzf.");
+	writeLine(
+		writer,
+		"  --pr        Select an open same-repo GitHub PR via fzf.",
+	);
 	writeLine(writer);
 	writeLine(writer, "Branch resolution order:");
 	writeLine(writer, "  1. exact local branch name");
@@ -191,7 +194,10 @@ export function printAddHelp(writer: CliWriter) {
 	writeLine(writer);
 	writeLine(writer, "PR mode:");
 	writeLine(writer, "  - Lists open same-repo PRs from `gh pr list`.");
-	writeLine(writer, "  - Shows `●` for existing worktrees and `○` for new ones.");
+	writeLine(
+		writer,
+		"  - Shows `●` for existing worktrees and `○` for new ones.",
+	);
 	writeLine(
 		writer,
 		"  - Fetches `origin/<headRefName>` only if the selected branch is missing.",
@@ -228,7 +234,9 @@ export async function selectPullRequestInteractive(
 		const selected = (
 			await $`printf '%s\n' ${input} | fzf --layout=reverse --height=80% --prompt='pr> '`.text()
 		).trim();
-		return items.find((pullRequest) => pullRequest.display === selected) ?? null;
+		return (
+			items.find((pullRequest) => pullRequest.display === selected) ?? null
+		);
 	} catch {
 		return null;
 	}
@@ -378,7 +386,9 @@ async function resolvePullRequestBranch(
 	const fetchResult = await fetchRemoteBranch("origin", headRefName);
 	if (fetchResult.exitCode !== 0) {
 		writeCapturedOutputTo(io.stderr, fetchResult);
-		throw new Error(`Failed to fetch selected PR branch: origin/${headRefName}`);
+		throw new Error(
+			`Failed to fetch selected PR branch: origin/${headRefName}`,
+		);
 	}
 	writeCapturedOutputTo(io.stderr, fetchResult);
 
@@ -387,7 +397,9 @@ async function resolvePullRequestBranch(
 		return resolveBranchArgument(headRefName, branches);
 	} catch (error) {
 		if (isBranchNotFoundError(error, headRefName)) {
-			throw new Error(`Selected PR branch not found after fetch: ${headRefName}`);
+			throw new Error(
+				`Selected PR branch not found after fetch: ${headRefName}`,
+			);
 		}
 		throw error;
 	}
@@ -532,5 +544,8 @@ async function createWorktreeForBranch({
 }
 
 function isBranchNotFoundError(error: unknown, branchName: string) {
-	return error instanceof Error && error.message === `Branch not found: ${branchName}`;
+	return (
+		error instanceof Error &&
+		error.message === `Branch not found: ${branchName}`
+	);
 }

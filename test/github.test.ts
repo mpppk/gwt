@@ -53,7 +53,9 @@ describe("formatPullRequestDisplay", () => {
 		expect(display).toContain("@octocat");
 		expect(display).toContain("feature/pr-123");
 		expect(display).toContain("2026-03-16T00:00:00Z");
-		expect(display.indexOf("#123")).toBeLessThan(display.indexOf("Add PR mode"));
+		expect(display.indexOf("#123")).toBeLessThan(
+			display.indexOf("Add PR mode"),
+		);
 		expect(display.indexOf("Add PR mode")).toBeLessThan(
 			display.indexOf("@octocat"),
 		);

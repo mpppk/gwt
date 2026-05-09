@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import type { PullRequestItem } from "../src/github.ts";
+import { type PullRequestSelectionItem, runAddCommand } from "../src/add.ts";
 import type { BranchItem, WorktreeInfo } from "../src/git.ts";
-import { runAddCommand, type PullRequestSelectionItem } from "../src/add.ts";
+import type { PullRequestItem } from "../src/github.ts";
 import { createBufferedIO } from "./helpers.ts";
 
 const encoder = new TextEncoder();

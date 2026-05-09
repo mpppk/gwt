@@ -176,7 +176,9 @@ describe("runCli", () => {
 	test("fails when add combines --new and --pr", async () => {
 		const io = createBufferedIO();
 
-		const exitCode = await runCli(["add", "--new", "feature/topic", "--pr"], { io });
+		const exitCode = await runCli(["add", "--new", "feature/topic", "--pr"], {
+			io,
+		});
 
 		expect(exitCode).toBe(1);
 		expect(io.readStderr()).toContain("Cannot combine --new with --pr");

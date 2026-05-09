@@ -17,7 +17,9 @@ function createDeps(
 	overrides: Partial<{
 		assertCommand: (cmd: string) => Promise<void>;
 		assertGitRepo: () => Promise<void>;
-		deleteLocalBranch: (branchName: string) => Promise<ReturnType<typeof result>>;
+		deleteLocalBranch: (
+			branchName: string,
+		) => Promise<ReturnType<typeof result>>;
 		getAheadCount: (path: string) => Promise<number>;
 		getCurrentWorktreeRoot: () => Promise<string>;
 		getMainWorktreeRoot: () => Promise<string>;
@@ -90,21 +92,21 @@ describe("runRemoveCommand", () => {
 
 		expect(exitCode).toBe(0);
 		expect(confirmCalls).toBe(0);
-			if (!removeCall) {
-				throw new Error("Expected removeWorktree to be called.");
-			}
-			if (!deleteBranchName) {
-				throw new Error("Expected deleteLocalBranch to be called.");
-			}
-			const recordedRemoveCall = removeCall as {
-				force: boolean;
-				path: string;
-			};
-			const recordedDeleteBranchName = deleteBranchName as string;
-			expect(recordedRemoveCall.force).toBe(false);
-			expect(recordedRemoveCall.path).toBe("/repo.worktrees/feature-topic");
-			expect(recordedDeleteBranchName).toBe("feature/topic");
-			expect(io.readStdout()).toContain("/repo.worktrees/feature-topic");
+		if (!removeCall) {
+			throw new Error("Expected removeWorktree to be called.");
+		}
+		if (!deleteBranchName) {
+			throw new Error("Expected deleteLocalBranch to be called.");
+		}
+		const recordedRemoveCall = removeCall as {
+			force: boolean;
+			path: string;
+		};
+		const recordedDeleteBranchName = deleteBranchName as string;
+		expect(recordedRemoveCall.force).toBe(false);
+		expect(recordedRemoveCall.path).toBe("/repo.worktrees/feature-topic");
+		expect(recordedDeleteBranchName).toBe("feature/topic");
+		expect(io.readStdout()).toContain("/repo.worktrees/feature-topic");
 	});
 
 	test("aborts when the selected dirty worktree is not confirmed", async () => {
