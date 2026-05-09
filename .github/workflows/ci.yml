@@ -26,4 +26,4 @@ jobs:
         run: bun run lint
 
       - name: Format check
-        run: bunx biome format --check .
+        run: bunx biome ci .
