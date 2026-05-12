@@ -35,9 +35,9 @@ export type ConfirmRemovalContext = {
 	worktree: RemovableWorktree;
 };
 
-export type SelectWorktree = (
+export type SelectWorktrees = (
 	items: RemovableWorktree[],
-) => Promise<RemovableWorktree | null>;
+) => Promise<RemovableWorktree[]>;
 
 export type ConfirmRemoval = (
 	context: ConfirmRemovalContext,
@@ -60,7 +60,7 @@ export type RunRemoveCommandOptions = {
 	confirmRemoval?: ConfirmRemoval;
 	deps?: Partial<RunRemoveCommandDependencies>;
 	io?: CliIO;
-	selectWorktree?: SelectWorktree;
+	selectWorktrees?: SelectWorktrees;
 };
 
 const defaultDeps: RunRemoveCommandDependencies = {
@@ -79,7 +79,7 @@ export async function runRemoveCommand({
 	confirmRemoval = confirmRemovalInteractive,
 	deps = {},
 	io = defaultIO,
-	selectWorktree = selectWorktreeInteractive,
+	selectWorktrees = selectWorktreesInteractive,
 }: RunRemoveCommandOptions = {}): Promise<number> {
 	const resolvedDeps = { ...defaultDeps, ...deps };
 
@@ -102,53 +102,59 @@ export async function runRemoveCommand({
 		throw new Error("No removable worktrees found.");
 	}
 
-	const selected = await selectWorktree(candidates);
-	if (!selected) {
+	const selected = await selectWorktrees(candidates);
+	if (selected.length === 0) {
 		return 130;
 	}
 
-	const risk = await getRemovalRisk(
-		selected.path,
-		resolvedDeps.isWorktreeDirty,
-		resolvedDeps.getAheadCount,
-	);
-	const shouldForce = risk.isDirty || risk.aheadCount > 0;
+	let exitCode = 0;
 
-	if (shouldForce) {
-		const confirmed = await confirmRemoval({ risk, worktree: selected }, io);
-		if (!confirmed) {
-			writeLine(io.stderr, "Removal aborted.");
-			return 1;
-		}
-	}
-
-	writeLine(io.stderr, `Removing worktree ${selected.path}...`);
-	const removeResult = await resolvedDeps.removeWorktree(
-		selected.path,
-		shouldForce,
-	);
-	if (removeResult.exitCode !== 0) {
-		writeCapturedOutputTo(io.stderr, removeResult);
-		throw new Error(`Failed to remove worktree: ${selected.path}`);
-	}
-	writeCapturedOutputTo(io.stderr, removeResult);
-	writeLine(io.stdout, selected.path);
-
-	writeLine(io.stderr, `Deleting branch ${selected.branchName}...`);
-	const deleteResult = await resolvedDeps.deleteLocalBranch(
-		selected.branchName,
-	);
-	if (deleteResult.exitCode !== 0) {
-		writeCapturedOutputTo(io.stderr, deleteResult);
-		writeLine(
-			io.stderr,
-			`Removed worktree ${selected.path}, but kept branch ${selected.branchName}.`,
+	for (const worktree of selected) {
+		const risk = await getRemovalRisk(
+			worktree.path,
+			resolvedDeps.isWorktreeDirty,
+			resolvedDeps.getAheadCount,
 		);
-		return 1;
-	}
-	writeCapturedOutputTo(io.stderr, deleteResult);
+		const shouldForce = risk.isDirty || risk.aheadCount > 0;
 
-	return 0;
+		if (shouldForce) {
+			const confirmed = await confirmRemoval({ risk, worktree }, io);
+			if (!confirmed) {
+				writeLine(io.stderr, "Removal aborted.");
+				exitCode = 1;
+				continue;
+			}
+		}
+
+		writeLine(io.stderr, `Removing worktree ${worktree.path}...`);
+		const removeResult = await resolvedDeps.removeWorktree(
+			worktree.path,
+			shouldForce,
+		);
+		if (removeResult.exitCode !== 0) {
+			writeCapturedOutputTo(io.stderr, removeResult);
+			throw new Error(`Failed to remove worktree: ${worktree.path}`);
+		}
+		writeCapturedOutputTo(io.stderr, removeResult);
+		writeLine(io.stdout, worktree.path);
+
+		writeLine(io.stderr, `Deleting branch ${worktree.branchName}...`);
+		const deleteResult = await resolvedDeps.deleteLocalBranch(
+			worktree.branchName,
+		);
+		if (deleteResult.exitCode !== 0) {
+			writeCapturedOutputTo(io.stderr, deleteResult);
+			writeLine(
+				io.stderr,
+				`Removed worktree ${worktree.path}, but kept branch ${worktree.branchName}.`,
+			);
+			exitCode = 1;
+			continue;
+		}
+		writeCapturedOutputTo(io.stderr, deleteResult);
+	}
+
+	return exitCode;
 }
 
 export function printRemoveHelp(writer: CliWriter) {
@@ -156,7 +162,7 @@ export function printRemoveHelp(writer: CliWriter) {
 	writeLine(writer);
 	writeLine(
 		writer,
-		"Select a linked worktree, remove it, and delete its local branch.",
+		"Select linked worktrees, remove them, and delete their local branches.",
 	);
 	writeLine(writer);
 	writeLine(writer, "Usage:");
@@ -172,11 +178,15 @@ export function printRemoveHelp(writer: CliWriter) {
 	);
 	writeLine(
 		writer,
-		"  - Asks for confirmation if the selected worktree has local changes or unpushed commits.",
+		"  - Use TAB to select multiple worktrees for batch removal.",
 	);
 	writeLine(
 		writer,
-		"  - Deletes the local branch with `git branch -d` after removing the worktree.",
+		"  - Asks for confirmation if a selected worktree has local changes or unpushed commits.",
+	);
+	writeLine(
+		writer,
+		"  - Deletes the local branch with `git branch -d` after removing each worktree.",
 	);
 	writeLine(writer);
 	writeLine(writer, "Requirements:");
@@ -185,18 +195,20 @@ export function printRemoveHelp(writer: CliWriter) {
 	writeLine(writer, "  - bun");
 }
 
-export async function selectWorktreeInteractive(
+export async function selectWorktreesInteractive(
 	items: RemovableWorktree[],
-): Promise<RemovableWorktree | null> {
+): Promise<RemovableWorktree[]> {
 	const input = items.map((worktree) => worktree.display).join("\n");
 
 	try {
-		const selected = (
-			await $`printf '%s\n' ${input} | fzf --layout=reverse --height=80% --prompt='worktree> '`.text()
+		const output = (
+			await $`printf '%s\n' ${input} | fzf --layout=reverse --height=80% --multi --prompt='worktree> '`.text()
 		).trim();
-		return items.find((worktree) => worktree.display === selected) ?? null;
+		if (!output) return [];
+		const selectedDisplays = new Set(output.split("\n"));
+		return items.filter((worktree) => selectedDisplays.has(worktree.display));
 	} catch {
-		return null;
+		return [];
 	}
 }
 

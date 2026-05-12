@@ -46,6 +46,10 @@ function createDeps(
 					path: "/repo.worktrees/feature-topic",
 					branch: "refs/heads/feature/topic",
 				},
+				{
+					path: "/repo.worktrees/feature-other",
+					branch: "refs/heads/feature/other",
+				},
 			] satisfies WorktreeInfo[],
 		removeWorktree: async () => result(),
 		...overrides,
@@ -59,7 +63,7 @@ describe("runRemoveCommand", () => {
 		const exitCode = await runRemoveCommand({
 			io,
 			deps: createDeps(),
-			selectWorktree: async () => null,
+			selectWorktrees: async () => [],
 		});
 
 		expect(exitCode).toBe(130);
@@ -87,7 +91,7 @@ describe("runRemoveCommand", () => {
 					return result();
 				},
 			}),
-			selectWorktree: async (items) => items[0] ?? null,
+			selectWorktrees: async (items) => (items[0] ? [items[0]] : []),
 		});
 
 		expect(exitCode).toBe(0);
@@ -126,7 +130,7 @@ describe("runRemoveCommand", () => {
 					return result();
 				},
 			}),
-			selectWorktree: async (items) => items[0] ?? null,
+			selectWorktrees: async (items) => (items[0] ? [items[0]] : []),
 		});
 
 		expect(exitCode).toBe(1);
@@ -151,7 +155,7 @@ describe("runRemoveCommand", () => {
 					return result();
 				},
 			}),
-			selectWorktree: async (items) => items[0] ?? null,
+			selectWorktrees: async (items) => (items[0] ? [items[0]] : []),
 		});
 
 		expect(exitCode).toBe(0);
@@ -175,11 +179,66 @@ describe("runRemoveCommand", () => {
 				deleteLocalBranch: async () =>
 					result(1, "", "error: branch is not fully merged\n"),
 			}),
-			selectWorktree: async (items) => items[0] ?? null,
+			selectWorktrees: async (items) => (items[0] ? [items[0]] : []),
 		});
 
 		expect(exitCode).toBe(1);
 		expect(io.readStdout()).toContain("/repo.worktrees/feature-topic");
 		expect(io.readStderr()).toContain("kept branch feature/topic");
+	});
+
+	test("removes multiple worktrees in sequence", async () => {
+		const io = createBufferedIO();
+		const removedPaths: string[] = [];
+		const deletedBranches: string[] = [];
+
+		const exitCode = await runRemoveCommand({
+			io,
+			deps: createDeps({
+				removeWorktree: async (path) => {
+					removedPaths.push(path);
+					return result();
+				},
+				deleteLocalBranch: async (branchName) => {
+					deletedBranches.push(branchName);
+					return result();
+				},
+			}),
+			selectWorktrees: async (items) => items,
+		});
+
+		expect(exitCode).toBe(0);
+		expect(removedPaths).toEqual([
+			"/repo.worktrees/feature-topic",
+			"/repo.worktrees/feature-other",
+		]);
+		expect(deletedBranches).toEqual(["feature/topic", "feature/other"]);
+		expect(io.readStdout()).toContain("/repo.worktrees/feature-topic");
+		expect(io.readStdout()).toContain("/repo.worktrees/feature-other");
+	});
+
+	test("skips unconfirmed risky worktree and continues with clean ones", async () => {
+		const io = createBufferedIO();
+		const removedPaths: string[] = [];
+
+		const exitCode = await runRemoveCommand({
+			io,
+			confirmRemoval: async ({ worktree }) => {
+				return worktree.path !== "/repo.worktrees/feature-topic";
+			},
+			deps: createDeps({
+				isWorktreeDirty: async (path) =>
+					path === "/repo.worktrees/feature-topic",
+				removeWorktree: async (path) => {
+					removedPaths.push(path);
+					return result();
+				},
+			}),
+			selectWorktrees: async (items) => items,
+		});
+
+		expect(exitCode).toBe(1);
+		expect(removedPaths).toEqual(["/repo.worktrees/feature-other"]);
+		expect(io.readStderr()).toContain("Removal aborted.");
 	});
 });
